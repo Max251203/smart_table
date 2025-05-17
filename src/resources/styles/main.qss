@@ -1,0 +1,66 @@
+QWidget {
+    font-family: Segoe UI, Arial, sans-serif;
+    font-size: 15px;
+}
+
+QPushButton {
+    padding: 6px 18px;
+    border-radius: 5px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #5dade2, stop:1 #2e86c1);
+    color: white;
+    font-weight: 600;
+    border: none;
+    min-width: 90px;
+    margin-right: 6px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #5499c7, stop:1 #2471a3);
+}
+QPushButton:pressed {
+    background: #154360;
+}
+QComboBox, QLineEdit {
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    padding: 5px 12px;
+    background: #f8fafd;
+    min-height: 32px;
+    font-size: 15px;
+}
+QComboBox:focus, QLineEdit:focus {
+    border: 1.5px solid #5dade2;
+    background: white;
+}
+QLabel {
+    font-size: 16px;
+    font-weight: 500;
+}
+QTableView {
+    gridline-color: #d0d0d0;
+    selection-background-color: #0078d7;
+    selection-color: white;
+    alternate-background-color: #f5f5f5;
+    background: #fcfcfc;
+}
+QTableView::item {
+    padding-left: 12px;
+    padding-right: 12px;
+}
+QTableView::item:selected {
+    background-color: #0078d7;
+    color: white;
+}
+QHeaderView::section {
+    background: #eaf2fb;
+    border: 1px solid #a4b0be;
+    padding-left: 10px;
+    padding-right: 25px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    font-size: 15px;
+    font-weight: 600;
+    min-width: 60px;
+    max-width: 350px;
+}

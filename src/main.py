@@ -1,27 +1,27 @@
 import sys
 import os
 
-# Добавляем путь к директории src в системные пути
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
+src_path = os.path.abspath(os.path.dirname(__file__))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
+from ui.Main.main_window import MainWindow
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
-from views.main_window import MainWindow
+from PySide6.QtCore import QFile, QTextStream
 
-def main():
+def load_stylesheet():
+    file = QFile(":/style/styles/main.qss")
+    if not file.exists():
+        print("QSS файл не найден: :/style/styles/main.qss")
+    if file.open(QFile.ReadOnly | QFile.Text):
+        return QTextStream(file).readAll()
+    return ""
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    try:
-        with open("resources/styles/main.qss", "r", encoding="utf-8") as f:
-            app.setStyleSheet(f.read())
-    except Exception as e:
-        print(f"Не удалось загрузить стили: {e}")
+    app.setStyleSheet(load_stylesheet())
 
     window = MainWindow()
     window.show()
 
     sys.exit(app.exec())
-
-if __name__ == "__main__":
-    main()
