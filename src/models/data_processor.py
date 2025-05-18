@@ -34,21 +34,47 @@ class DataProcessor:
     def filter_data(self, column: str, filter_text: str) -> pd.DataFrame:
         if self.current_df is None or column not in self.current_df.columns:
             return pd.DataFrame()
-        # Поиск по номеру только точное совпадение
-        if column.lower().strip() in ["excel #", "№"]:
-            return self.current_df[self.current_df[column] == filter_text].copy()
+        
         if not filter_text:
             return self.current_df.copy()
+        
+        # Проверяем, является ли колонка числовой
+        is_numeric = True
+        try:
+            # Проверяем, можно ли преобразовать непустые значения в числа
+            values = [v for v in self.current_df[column].unique() if str(v).strip()]
+            for v in values:
+                float(v)
+        except ValueError:
+            is_numeric = False
+        
+        # Если колонка числовая, делаем точное числовое сравнение
+        if is_numeric:
+            try:
+                filter_value = float(filter_text)
+                # Преобразуем строковые значения в числа для сравнения
+                mask = self.current_df[column].apply(
+                    lambda x: str(x).strip() and float(str(x).strip()) == filter_value if str(x).strip() else False
+                )
+                return self.current_df[mask].copy()
+            except ValueError:
+                # Если не удалось преобразовать filter_text в число, продолжаем обычный поиск
+                pass
+        
+        # Если это не числовая колонка или числовой поиск не дал результатов, используем существующую логику
         normalized_filter = self.text_processor.normalize(filter_text)
+        
         if self.similar_groups:
             for group_key, group_values in self.similar_groups.items():
                 if self.text_processor.normalize(group_key) == normalized_filter:
                     mask = self.current_df[column].isin(group_values)
                     return self.current_df[mask].copy()
+        
         keywords = self.text_processor.extract_keywords(filter_text)
         if keywords:
             mask = self.current_df[column].apply(
                 lambda x: all(kw in self.text_processor.normalize(x) for kw in keywords)
             )
             return self.current_df[mask].copy()
+        
         return pd.DataFrame()

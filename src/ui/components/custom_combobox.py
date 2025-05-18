@@ -8,6 +8,9 @@ class SmartComboBox(QComboBox):
         self.setMinimumWidth(250)
         self.setMaxVisibleItems(15)
         self.setMaximumWidth(600)
+        
+        # Отключаем автодобавление элементов в список
+        self.setInsertPolicy(QComboBox.NoInsert)
 
         list_view = QListView(self)
         list_view.setWordWrap(True)
@@ -15,8 +18,6 @@ class SmartComboBox(QComboBox):
         self.setView(list_view)
 
         self.setItemDelegate(ComboBoxDelegate())
-
-        # 🔻 Больше не нужен код для стрелки — она подключается через QSS
 
     def showPopup(self):
         width = max(
