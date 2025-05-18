@@ -119,9 +119,6 @@ class TableController(QObject):
             return False
             
         try:
-            # Сохраняем копию текущего DataFrame перед изменениями
-            original_df = self.data_processor.current_df.copy()
-            
             # Создаем новую запись
             new_record = {}
             
@@ -136,26 +133,40 @@ class TableController(QObject):
                     else:
                         new_record[col] = ""
             
-            # Добавляем запись в DataFrame
+            # Проверяем, можно ли сохранить в Excel
+            if self.current_file_path and not self._can_save_to_excel():
+                return False
+            
+            # Если проверка прошла успешно или не требуется сохранение, добавляем запись
             self.data_processor.add_record(new_record)
             
-            # Пытаемся сохранить изменения в Excel-файл
+            # Сохраняем изменения в Excel-файл
             if self.current_file_path:
                 save_result = self.save_to_excel()
                 if not save_result:
-                    # Если сохранение не удалось, возвращаем DataFrame в исходное состояние
-                    self.data_processor.current_df = original_df
-                    self.model.set_dataframe(original_df)
-                    self.view.adjust_columns()
                     return False
             
-            # Если всё прошло успешно или не требовалось сохранение, обновляем модель
+            # Обновляем модель
             self.model.set_dataframe(self.data_processor.current_df)
             self.view.adjust_columns()
             return True
-            
+                
         except Exception as e:
             print(f"Ошибка при добавлении записи: {e}")
+            return False
+            
+    def _can_save_to_excel(self) -> bool:
+        """Проверяет, можно ли сохранить данные в Excel-файл."""
+        if not self.current_file_path:
+            return False
+            
+        try:
+            # Проверяем, не открыт ли файл в другой программе
+            # Пытаемся открыть файл для записи
+            with open(self.current_file_path, 'a+b'):
+                pass
+            return True
+        except Exception:
             return False
             
     def save_to_excel(self) -> bool:
@@ -176,64 +187,20 @@ class TableController(QObject):
             if not os.path.exists(temp_file):
                 return False
                 
-            # Если оригинальный файл заблокирован, спрашиваем что делать
+            # Пробуем заменить оригинальный файл
             try:
-                # Пробуем заменить оригинальный файл
                 if os.path.exists(self.current_file_path):
                     os.replace(temp_file, self.current_file_path)
                 else:
                     os.rename(temp_file, self.current_file_path)
                 return True
-            except PermissionError:
-                # Если файл заблокирован (открыт в Excel и т.д.)
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Warning)
-                msg.setText("Файл Excel заблокирован для записи!")
-                msg.setInformativeText(f"Не удается сохранить изменения в '{file_name}'. Возможно, файл открыт в Excel. Закройте файл и повторите попытку.")
-                msg.setWindowTitle("Ошибка сохранения")
-                
-                # Создаем кнопки и устанавливаем им objectName для стилизации через QSS
-                save_as_btn = QPushButton("Сохранить как...")
-                save_as_btn.setObjectName("saveAsButton")
-                
-                retry_btn = QPushButton("Повторить")
-                retry_btn.setObjectName("retryButton")
-                
-                cancel_btn = QPushButton("Отмена")
-                cancel_btn.setObjectName("cancelButton")
-                
-                msg.addButton(save_as_btn, QMessageBox.ActionRole)
-                msg.addButton(retry_btn, QMessageBox.ActionRole)
-                msg.addButton(cancel_btn, QMessageBox.RejectRole)
-                
-                msg.exec()
-                
-                clicked_btn = msg.clickedButton()
-                
-                if clicked_btn == retry_btn:
-                    # Пробуем снова
-                    return self.save_to_excel()
-                elif clicked_btn == save_as_btn:
-                    # Сохраняем с новым именем
-                    from PySide6.QtWidgets import QFileDialog
-                    new_path, _ = QFileDialog.getSaveFileName(
-                        None, 
-                        "Сохранить как", 
-                        self.current_file_path,
-                        "Excel Files (*.xlsx *.xls)"
-                    )
-                    if new_path:
-                        self.data_processor.save_excel(new_path)
-                        self.current_file_path = new_path
-                        return True
-                
-                # Удаляем временный файл, если он все еще существует
+            except Exception:
+                # Если файл заблокирован или другая ошибка
                 if os.path.exists(temp_file):
                     try:
                         os.remove(temp_file)
                     except:
                         pass
-                        
                 return False
                 
         except Exception as e:

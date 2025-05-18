@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
                              QLabel, QTextEdit, QPushButton, 
-                             QScrollArea, QWidget)
+                             QScrollArea, QWidget, QMessageBox)
 from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon
 from typing import List, Dict, Set
@@ -9,7 +9,7 @@ from ui.components.custom_combobox import SmartComboBox
 class RecordDialog(QDialog):
     def __init__(self, columns: List[str], parent=None, record_data: Dict[str, str] = None, 
                  column_max_lengths: Dict[str, int] = None, column_values: Dict[str, List[str]] = None,
-                 work_place_groups: Dict[str, Dict[str, set]] = None):
+                 work_place_groups: Dict[str, Dict[str, set]] = None, table_controller=None):
         super().__init__(parent)
         
         self.setWindowTitle("Добавление записи" if record_data is None else "Редактирование записи")
@@ -23,6 +23,8 @@ class RecordDialog(QDialog):
         self.work_place_groups = work_place_groups or {}
         self.field_widgets = {}
         self.current_focus_widget = None
+        self.table_controller = table_controller  # Добавляем ссылку на контроллер таблицы
+        self.success = False  # Флаг успешного добавления
         
         self._init_ui()
         
@@ -163,7 +165,7 @@ class RecordDialog(QDialog):
         button_layout.addWidget(self.save_button)
         
         main_layout.addLayout(button_layout)
-    
+
     def _is_long_text(self, column: str) -> bool:
         """Определяет, нужно ли для колонки использовать многострочное поле.
         
@@ -245,3 +247,46 @@ class RecordDialog(QDialog):
             elif isinstance(widget, QTextEdit):
                 result[column] = widget.toPlainText()
         return result
+    
+    def accept(self):
+        # Переопределяем стандартный метод accept
+        # Не закрываем диалог сразу, а пытаемся сохранить данные
+        if self.table_controller:
+            record_data = self.get_record_data()
+            
+            # Проверяем, что есть хотя бы одно непустое поле
+            has_data = False
+            for value in record_data.values():
+                if value and value.strip():
+                    has_data = True
+                    break
+                    
+            if not has_data:
+                QMessageBox.warning(
+                    self, 
+                    "Пустая запись", 
+                    "Невозможно добавить полностью пустую запись. Введите хотя бы одно значение."
+                )
+                return  # Остаемся в диалоге
+                
+            # Пытаемся добавить запись
+            success = self.table_controller.add_record(record_data)
+            
+            if success:
+                QMessageBox.information(
+                    self, 
+                    "Запись добавлена", 
+                    "Новая запись успешно добавлена в таблицу и сохранена в Excel-файл."
+                )
+                self.success = True  # Устанавливаем флаг успешного добавления
+                super().accept()  # Закрываем диалог только при успехе
+            else:
+                QMessageBox.critical(
+                    self, 
+                    "Ошибка сохранения", 
+                    "Не удалось добавить запись. Возможно, Excel-файл заблокирован для записи или открыт в другой программе.",
+                    QMessageBox.Ok
+                )
+                # Остаемся в диалоге
+        else:
+            super().accept()  # Если нет контроллера, просто закрываем диалог

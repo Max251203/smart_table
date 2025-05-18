@@ -188,6 +188,7 @@ class MainWindow(QMainWindow):
         self._update_search_button_state()
 
     # Метод для добавления записи в MainWindow
+    # main_window.py - обновляем метод _show_add_record_dialog
     def _show_add_record_dialog(self):
         if self.table_controller.model is None:
             QMessageBox.warning(self, "Предупреждение", "Сначала загрузите Excel файл.")
@@ -232,40 +233,14 @@ class MainWindow(QMainWindow):
             self,
             column_max_lengths=column_max_lengths,
             column_values=column_values,
-            work_place_groups=work_place_groups
+            work_place_groups=work_place_groups,
+            table_controller=self.table_controller  # Передаем контроллер таблицы
         )
         
         if dialog.exec():
-            # Получаем данные из диалога и добавляем их в таблицу
-            record_data = dialog.get_record_data()
-            
-            # Проверяем, что есть хотя бы одно непустое поле
-            has_data = False
-            for value in record_data.values():
-                if value and value.strip():
-                    has_data = True
-                    break
-                    
-            if not has_data:
-                QMessageBox.warning(
-                    self, 
-                    "Пустая запись", 
-                    "Невозможно добавить полностью пустую запись. Введите хотя бы одно значение."
-                )
-                return
-                
-            # Добавляем запись
-            success = self.table_controller.add_record(record_data)
-            
-            if success:
-                QMessageBox.information(
-                    self, 
-                    "Запись добавлена", 
-                    "Новая запись успешно добавлена в таблицу и сохранена в Excel-файл."
-                )
-            else:
-                QMessageBox.warning(
-                    self, 
-                    "Ошибка", 
-                    "Не удалось добавить запись. Проверьте доступность Excel-файла для записи."
-                )
+            # Если диалог был успешно закрыт (запись добавлена)
+            if dialog.success:
+                # Обновляем список ключевых слов для текущей колонки
+                current_column = self.column_box.currentText()
+                if current_column:
+                    self.filter_controller.on_column_change(self.column_box.currentIndex())
