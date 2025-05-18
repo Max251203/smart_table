@@ -14,13 +14,56 @@ QPushButton {
     min-width: 90px;
     margin-right: 6px;
 }
+
 QPushButton:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                stop:0 #5499c7, stop:1 #2471a3);
 }
+
 QPushButton:pressed {
     background: #154360;
 }
+
+/* Кнопка закрепления панели поиска */
+#pinButton {
+    background: transparent;
+    border: none;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    padding: 0;
+    margin: 0;
+}
+
+#pinButton:hover {
+    background: rgba(200, 200, 200, 0.3);
+    border-radius: 4px;
+}
+
+#pinButton:pressed {
+    background: rgba(180, 180, 180, 0.5);
+}
+
+/* Кнопка активного поиска */
+#btnSmartSearchActive {
+    padding: 6px 18px;
+    border-radius: 5px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #4ca1ec, stop:1 #267CC2);
+    color: white;
+    font-weight: 600;
+    border: none;
+    min-width: 90px;
+    margin-right: 6px;
+}
+
+/* Кнопка поиска в панели - как обычная кнопка */
+#btnSearch {
+    min-width: 80px;
+    margin-right: 6px;
+}
+
 QComboBox, QLineEdit {
     border: 1px solid #bbb;
     border-radius: 4px;
@@ -29,14 +72,32 @@ QComboBox, QLineEdit {
     min-height: 32px;
     font-size: 15px;
 }
+
 QComboBox:focus, QLineEdit:focus {
     border: 1.5px solid #5dade2;
     background: white;
 }
+
 QLabel {
     font-size: 16px;
     font-weight: 500;
 }
+
+/* Метки для области поиска */
+#searchLabel {
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+}
+
+/* Панель поиска */
+#searchPanel {
+    background-color: #f5f9fc;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+}
+
 QTableView {
     gridline-color: #d0d0d0;
     selection-background-color: #0078d7;
@@ -44,14 +105,17 @@ QTableView {
     alternate-background-color: #f5f5f5;
     background: #fcfcfc;
 }
+
 QTableView::item {
     padding-left: 12px;
     padding-right: 12px;
 }
+
 QTableView::item:selected {
     background-color: #0078d7;
     color: white;
 }
+
 QHeaderView::section {
     background: #eaf2fb;
     border: 1px solid #a4b0be;
@@ -63,4 +127,75 @@ QHeaderView::section {
     font-weight: 600;
     min-width: 60px;
     max-width: 350px;
+}
+
+/* Стили для диалога добавления записи */
+#recordDialog {
+    background-color: #f8f8f8;
+}
+
+#recordScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+#recordFormContainer {
+    background-color: transparent;
+}
+
+#recordFieldLabel {
+    font-size: 14px;
+    font-weight: 500;
+    color: #444;
+    margin-bottom: 2px;
+}
+
+#recordLineEdit {
+    padding: 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f8fafd;
+    min-height: 30px;
+}
+
+#recordLineEdit:focus {
+    border: 1.5px solid #5dade2;
+    background: white;
+}
+
+#recordTextEdit {
+    padding: 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f8fafd;
+}
+
+#recordTextEdit:focus {
+    border: 1.5px solid #5dade2;
+    background: white;
+}
+
+#recordCancelButton, #recordSaveButton {
+    min-width: 120px;
+    min-height: 35px;
+}
+
+#recordSaveButton {
+    min-width: 150px;
+}
+
+/* Добавьте эти стили в main.qss */
+
+#recordComboBox {
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    padding: 5px 12px;
+    background: #f8fafd;
+    min-height: 32px;
+    font-size: 15px;
+}
+
+#recordComboBox:focus {
+    border: 1.5px solid #5dade2;
+    background: white;
 }

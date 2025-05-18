@@ -15,74 +15,43 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainLayout">
+    <property name="leftMargin">
+     <number>6</number>
+    </property>
+    <property name="topMargin">
+     <number>6</number>
+    </property>
+    <property name="rightMargin">
+     <number>6</number>
+    </property>
+    <property name="bottomMargin">
+     <number>6</number>
+    </property>
     <item>
      <layout class="QHBoxLayout" name="toolbarLayout">
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
       <item>
-       <widget class="QLabel" name="labelColumn">
+       <widget class="QPushButton" name="btnSmartSearch">
         <property name="text">
-         <string>Колонка:</string>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>70</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>90</width>
-          <height>16777215</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="comboColumns"/>
-      </item>
-      <item>
-       <widget class="QLabel" name="labelKeyword">
-        <property name="text">
-         <string>Ключевые слова:</string>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>120</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>150</width>
-          <height>16777215</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="comboKeywords"/>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnSearch">
-        <property name="text">
-         <string>Найти</string>
+        <string>Умный поиск</string>
         </property>
         <property name="icon">
-         <iconset resource="../../resources/resources_rc.qrc">
-          <normaloff>:/icon/icons/search.png</normaloff>:/icon/icons/search.png</iconset>
+        <iconset resource="../../resources/resources_rc.qrc">
+          <normaloff>:/icon/icons/arrow_down.png</normaloff>:/icon/icons/arrow_down.png
+        </iconset>
         </property>
-       </widget>
+        <property name="iconSize">
+        <size>
+          <width>24</width>
+          <height>24</height>
+        </size>
+        </property>
+      </widget>
       </item>
       <item>
        <widget class="QPushButton" name="btnReset">
@@ -91,7 +60,32 @@
         </property>
         <property name="icon">
          <iconset resource="../../resources/resources_rc.qrc">
-          <normaloff>:/icon/icons/reset.png</normaloff>:/icon/icons/reset.png</iconset>
+          <normaloff>:/icon/icons/reset.png</normaloff>:/icon/icons/reset.png
+         </iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnAddRecord">
+        <property name="text">
+         <string>Добавить запись</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../resources/resources_rc.qrc">
+          <normaloff>:/icon/icons/add.png</normaloff>:/icon/icons/add.png
+         </iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
         </property>
        </widget>
       </item>
@@ -102,14 +96,86 @@
         </property>
         <property name="icon">
          <iconset resource="../../resources/resources_rc.qrc">
-          <normaloff>:/icon/icons/open.png</normaloff>:/icon/icons/open.png</iconset>
+          <normaloff>:/icon/icons/open.png</normaloff>:/icon/icons/open.png
+         </iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
         </property>
        </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
       </item>
      </layout>
     </item>
     <item>
-     <widget class="QTableView" name="tableView"/>
+     <widget class="QWidget" name="searchPanelContainer" native="true">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>60</height>
+       </size>
+      </property>
+      <property name="visible">
+       <bool>false</bool>
+      </property>
+      <layout class="QHBoxLayout" name="searchPanelLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QFrame" name="searchPanel">
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="tableContainer" native="true">
+      <layout class="QVBoxLayout" name="tableLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+      </layout>
+     </widget>
     </item>
    </layout>
   </widget>

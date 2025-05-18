@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from PySide6.QtCore import QObject, Qt
 from models.table_model import SmartTableModel
 from models.data_processor import DataProcessor
@@ -81,3 +81,30 @@ class TableController(QObject):
         if self.model is None or self.data_processor.current_df is None:
             return []
         return self.data_processor.current_df[column_name].unique().tolist()
+        
+    def analyze_column_data(self, column_name: str) -> Dict:
+        """Анализирует данные колонки и возвращает статистику."""
+        if self.model is None or self.data_processor.current_df is None:
+            return {}
+            
+        try:
+            column_data = self.data_processor.current_df[column_name]
+            result = {
+                "max_length": max([len(str(v)) for v in column_data if v and str(v).strip()], default=0),
+                "unique_count": len(column_data.unique()),
+                "is_numeric": False,
+                "is_date": False,
+                "sample_values": list(column_data.unique())[:10]
+            }
+            
+            # Проверяем, числовая ли колонка
+            try:
+                numeric_values = pd.to_numeric(column_data, errors='coerce')
+                if not numeric_values.isna().all():
+                    result["is_numeric"] = True
+            except:
+                pass
+                
+            return result
+        except:
+            return {}

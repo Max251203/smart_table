@@ -1,4 +1,5 @@
-from PySide6.QtCore import QObject, QRunnable, Signal, QThreadPool
+from PySide6.QtCore import QObject, QRunnable, Signal, QThreadPool, Qt
+from PySide6.QtWidgets import QCompleter  # Добавляем импорт
 from models.data_processor import DataProcessor
 from controllers.table_controller import TableController
 from ui.components.custom_combobox import SmartComboBox
@@ -53,9 +54,43 @@ class FilterController(QObject):
             return
 
         column_name = self.column_box.currentText()
-        if column_name.lower().strip() == "место работы (учёбы)":
-            similar_groups = self.data_processor.analyze_column(column_name)
-            self.keyword_edit.addItems(sorted(similar_groups.keys()))
+        
+        # Сначала устанавливаем режим редактирования
+        self.keyword_edit.setEditable(True)
+        
+        # Специальная обработка для места работы (учёбы)
+        if "место работы" in column_name.lower() or "учёбы" in column_name.lower():
+            try:
+                similar_groups = self.data_processor.analyze_column(column_name)
+                
+                # Добавляем в комбобокс только ключи групп
+                self.keyword_edit.addItems(sorted(similar_groups.keys()))
+                
+                # Собираем все возможные варианты для автодополнения
+                all_values = set()
+                for key, values in similar_groups.items():
+                    all_values.add(key)
+                    all_values.update(values)
+                
+                # Устанавливаем комплитер
+                if self.keyword_edit.isEditable():
+                    completer = QCompleter(sorted(list(all_values)))
+                    completer.setCaseSensitivity(Qt.CaseInsensitive)
+                    completer.setFilterMode(Qt.MatchContains)
+                    self.keyword_edit.setCompleter(completer)
+                
+            except Exception as e:
+                print(f"Ошибка при анализе колонки: {e}")
+                # Если ошибка, обрабатываем как обычную колонку
+                values = self.table_controller.get_column_values(column_name)
+                self.keyword_edit.addItems(sorted(str(v).strip() for v in values if str(v).strip()))
+                
+                # Стандартный комплитер
+                if self.keyword_edit.isEditable():
+                    completer = QCompleter([str(v).strip() for v in values if str(v).strip()])
+                    completer.setCaseSensitivity(Qt.CaseInsensitive)
+                    completer.setFilterMode(Qt.MatchContains)
+                    self.keyword_edit.setCompleter(completer)
         else:
             values = self.table_controller.get_column_values(column_name)
             # Определяем: нужно ли сортировать численно?
@@ -67,11 +102,33 @@ class FilterController(QObject):
                     # Оставим отображение в исходном виде (без .0 если целое)
                     display_values = [str(int(v)) if float(v).is_integer() else str(v) for v in numeric_values]
                     self.keyword_edit.addItems(display_values)
+                    
+                    # Стандартный комплитер
+                    if self.keyword_edit.isEditable():
+                        completer = QCompleter(display_values)
+                        completer.setCaseSensitivity(Qt.CaseInsensitive)
+                        completer.setFilterMode(Qt.MatchContains)
+                        self.keyword_edit.setCompleter(completer)
                 except Exception:
-                    self.keyword_edit.addItems(sorted(str(v).strip() for v in values if str(v).strip()))
+                    filtered_values = sorted(str(v).strip() for v in values if str(v).strip())
+                    self.keyword_edit.addItems(filtered_values)
+                    
+                    # Стандартный комплитер
+                    if self.keyword_edit.isEditable():
+                        completer = QCompleter(filtered_values)
+                        completer.setCaseSensitivity(Qt.CaseInsensitive)
+                        completer.setFilterMode(Qt.MatchContains)
+                        self.keyword_edit.setCompleter(completer)
             else:
-                self.keyword_edit.addItems(sorted(str(v).strip() for v in values if str(v).strip()))
-        self.keyword_edit.setEditable(True)
+                filtered_values = sorted(str(v).strip() for v in values if str(v).strip())
+                self.keyword_edit.addItems(filtered_values)
+                
+                # Стандартный комплитер
+                if self.keyword_edit.isEditable():
+                    completer = QCompleter(filtered_values)
+                    completer.setCaseSensitivity(Qt.CaseInsensitive)
+                    completer.setFilterMode(Qt.MatchContains)
+                    self.keyword_edit.setCompleter(completer)
 
     def apply_filter(self):
         if self.current_filter_worker is not None:
@@ -96,5 +153,3 @@ class FilterController(QObject):
     def reset_all(self):
         self.keyword_edit.setCurrentText("")
         self.table_controller.reset_all()
-
-        

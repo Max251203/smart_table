@@ -1,9 +1,12 @@
-from PySide6.QtWidgets import QMainWindow, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QMainWindow, QFileDialog, QMessageBox, QHBoxLayout, QLabel, QPushButton, QWidget, QCompleter
+from PySide6.QtCore import Qt, QPropertyAnimation, QSize
+from PySide6.QtGui import QIcon
 from ui.Main.main_ui import Ui_MainWindow
 from controllers.table_controller import TableController
 from controllers.filter_controller import FilterController
 from ui.components.custom_combobox import SmartComboBox
 from ui.components.table_view import SmartTableView
+from ui.components.record_dialog import RecordDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -12,25 +15,83 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        self._init_search_panel()
         self._init_custom_widgets()
         self._init_controllers()
         self._connect_signals()
+        self._search_panel_pinned = False
+        self._update_search_button_state()
+
+    def _init_search_panel(self):
+        # Создаем макет для панели поиска
+        layout = QHBoxLayout(self.ui.searchPanel)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(8)
+        
+        # Метка "Искать по:" вместо "Колонка:"
+        label_column = QLabel("Искать по:")
+        label_column.setObjectName("searchLabel")
+        label_column.setMinimumWidth(80)
+        label_column.setMaximumWidth(100)
+        layout.addWidget(label_column, 0)
+        
+        # ComboBox для колонок (будет заменен на SmartComboBox)
+        self.column_box_placeholder = QWidget()
+        layout.addWidget(self.column_box_placeholder, 4)
+        
+        # Метка "Ключевые слова"
+        label_keyword = QLabel("Ключевые слова:")
+        label_keyword.setObjectName("searchLabel")
+        label_keyword.setMinimumWidth(120)
+        label_keyword.setMaximumWidth(150)
+        layout.addWidget(label_keyword, 0)
+        
+        # ComboBox для ключевых слов (будет заменен на SmartComboBox)
+        self.keyword_box_placeholder = QWidget()
+        layout.addWidget(self.keyword_box_placeholder, 4)
+        
+        # Кнопка поиска - используем те же стили, что и для верхних кнопок
+        self.btn_search = QPushButton("Найти")
+        self.btn_search.setObjectName("btnSearch")
+        self.btn_search.setIcon(QIcon(":/icon/icons/search.png"))
+        self.btn_search.setIconSize(QSize(24, 24))
+        layout.addWidget(self.btn_search, 0)
+        
+        # Кнопка закрепления панели - делаем её минималистичной
+        self.btn_pin = QPushButton()
+        self.btn_pin.setObjectName("pinButton")
+        self.btn_pin.setIcon(QIcon(":/icon/icons/pin_off.png"))
+        self.btn_pin.setIconSize(QSize(24, 24))
+        self.btn_pin.setCheckable(True)
+        self.btn_pin.setToolTip("Закрепить панель поиска")
+        self.btn_pin.setFixedSize(QSize(32, 32))
+        layout.addWidget(self.btn_pin, 0)
+        
+        # Настраиваем ID для панели поиска
+        self.ui.searchPanel.setObjectName("searchPanel")
 
     def _init_custom_widgets(self):
-        # Подменяем comboBox на SmartComboBox
+        # Создаем и настраиваем SmartComboBox для колонок и ключевых слов
         self.column_box = SmartComboBox()
         self.keyword_box = SmartComboBox()
         self.keyword_box.setEditable(True)
-
-        self.ui.toolbarLayout.replaceWidget(self.ui.comboColumns, self.column_box)
-        self.ui.toolbarLayout.replaceWidget(self.ui.comboKeywords, self.keyword_box)
-        self.ui.comboColumns.deleteLater()
-        self.ui.comboKeywords.deleteLater()
-
-        # Подменяем tableView на SmartTableView
+        
+        # Заменяем placeholder виджеты на реальные комбобоксы
+        layout = self.ui.searchPanel.layout()
+        layout.replaceWidget(self.column_box_placeholder, self.column_box)
+        layout.replaceWidget(self.keyword_box_placeholder, self.keyword_box)
+        self.column_box_placeholder.deleteLater()
+        self.keyword_box_placeholder.deleteLater()
+        
+        # Создаем и настраиваем SmartTableView
         self.table_view = SmartTableView()
-        self.ui.mainLayout.replaceWidget(self.ui.tableView, self.table_view)
-        self.ui.tableView.deleteLater()
+        self.ui.tableLayout.addWidget(self.table_view)
+        
+        # Исправление размера иконки на кнопке "Умный поиск" - одинаковый размер с другими кнопками
+        self.ui.btnSmartSearch.setIconSize(QSize(24, 24))
+        # Делаем кнопку умного поиска одинакового размера с другими кнопками
+        self.ui.btnSmartSearch.setMinimumWidth(self.ui.btnReset.minimumWidth())
+        self.ui.btnSmartSearch.setMinimumHeight(self.ui.btnReset.minimumHeight())
 
     def _init_controllers(self):
         self.table_controller = TableController(self.table_view)
@@ -41,11 +102,19 @@ class MainWindow(QMainWindow):
         )
 
     def _connect_signals(self):
+        # Подключаем сигналы для кнопок на основной панели инструментов
         self.ui.btnLoad.clicked.connect(self._load_excel)
-        self.ui.btnSearch.clicked.connect(self.filter_controller.apply_filter)
         self.ui.btnReset.clicked.connect(self.filter_controller.reset_all)
+        self.ui.btnSmartSearch.clicked.connect(self._toggle_search_panel)
+        self.ui.btnAddRecord.clicked.connect(self._show_add_record_dialog)
+        
+        # Подключаем сигналы элементов панели поиска
+        self.btn_search.clicked.connect(self.filter_controller.apply_filter)
+        self.btn_pin.clicked.connect(self._toggle_pin_search_panel)
         self.column_box.currentIndexChanged.connect(self.filter_controller.on_column_change)
         self.keyword_box.lineEdit().returnPressed.connect(self.filter_controller.apply_filter)
+        
+        # Подключаем сигналы таблицы
         self.table_view.sortRequested.connect(self.table_controller.sort_column)
         self.table_view.numberModeChanged.connect(self.table_controller.toggle_number_mode)
 
@@ -61,3 +130,117 @@ class MainWindow(QMainWindow):
                     self, "Ошибка",
                     "Не удалось загрузить файл. Проверьте формат или структуру таблицы."
                 )
+
+    def _toggle_search_panel(self):
+        # Если нажата кнопка закрепления, панель не скрывается
+        if self._search_panel_pinned:
+            return
+            
+        is_visible = self.ui.searchPanelContainer.isVisible()
+        
+        # Создаем анимацию показа/скрытия панели
+        self.ui.searchPanelContainer.setVisible(True)
+        self.animation = QPropertyAnimation(self.ui.searchPanelContainer, b"maximumHeight")
+        self.animation.setDuration(200)
+        
+        if is_visible:
+            self.animation.setStartValue(60)
+            self.animation.setEndValue(0)
+            self.animation.finished.connect(lambda: self.ui.searchPanelContainer.setVisible(False))
+        else:
+            self.animation.setStartValue(0)
+            self.animation.setEndValue(60)
+            
+        self.animation.start()
+        
+        # Обновляем состояние кнопки поиска
+        self._update_search_button_state()
+
+    def _toggle_pin_search_panel(self, checked):
+        self._search_panel_pinned = checked
+        
+        # Обновляем иконку кнопки закрепления
+        if checked:
+            self.btn_pin.setIcon(QIcon(":/icon/icons/pin_on.png"))
+            self.btn_pin.setToolTip("Открепить панель поиска")
+            
+            # Если панель скрыта, но нажали кнопку закрепления, показываем панель
+            if not self.ui.searchPanelContainer.isVisible():
+                self._toggle_search_panel()
+        else:
+            self.btn_pin.setIcon(QIcon(":/icon/icons/pin_off.png"))
+            self.btn_pin.setToolTip("Закрепить панель поиска")
+        
+        # Обновляем состояние кнопки поиска
+        self._update_search_button_state()
+
+    def _update_search_button_state(self):
+        """Обновляет визуальное состояние кнопки умного поиска"""
+        is_visible = self.ui.searchPanelContainer.isVisible()
+        
+        if is_visible:
+            # Если панель видима - меняем иконку на стрелку вверх
+            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_up.png"))
+            self.ui.btnSmartSearch.setObjectName("btnSmartSearchActive")
+        else:
+            # Если панель скрыта - стрелка вниз
+            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_down.png"))
+            self.ui.btnSmartSearch.setObjectName("btnSmartSearch")
+        
+        # Перерисовываем кнопку чтобы применить новые стили
+        self.ui.btnSmartSearch.style().unpolish(self.ui.btnSmartSearch)
+        self.ui.btnSmartSearch.style().polish(self.ui.btnSmartSearch)
+        self.ui.btnSmartSearch.update()
+
+    def _show_add_record_dialog(self):
+        if self.table_controller.model is None:
+            QMessageBox.warning(self, "Предупреждение", "Сначала загрузите Excel файл.")
+            return
+            
+        columns = self.table_controller.get_columns()
+        
+        # Собираем существующие значения для автозаполнения
+        column_values = {}
+        for column in columns:
+            if column.lower() not in ["excel #", "№", "№ (порядок)"]:
+                try:
+                    values = self.table_controller.get_column_values(column)
+                    unique_values = list(set([str(v) for v in values if v and str(v).strip()]))
+                    column_values[column] = unique_values
+                except:
+                    column_values[column] = []
+        
+        # Получаем группы для поля "место работы (учёбы)"
+        work_place_groups = {}
+        for column in columns:
+            if "место работы" in column.lower() or "учёбы" in column.lower():
+                try:
+                    similar_groups = self.table_controller.data_processor.analyze_column(column)
+                    if similar_groups:
+                        work_place_groups[column] = similar_groups
+                except Exception as e:
+                    print(f"Ошибка при анализе колонки: {e}")
+        
+        # Определяем примерную длину текста для каждой колонки
+        column_max_lengths = {}
+        for column in columns:
+            try:
+                values = self.table_controller.get_column_values(column)
+                max_length = max([len(str(val)) for val in values if val]) if values else 0
+                column_max_lengths[column] = max_length
+            except:
+                column_max_lengths[column] = 0
+                
+        dialog = RecordDialog(
+            columns, 
+            self,
+            column_max_lengths=column_max_lengths,
+            column_values=column_values,
+            work_place_groups=work_place_groups
+        )
+        
+        if dialog.exec():
+            # Получаем данные из диалога и добавляем их в таблицу
+            # Эта функциональность будет реализована позже
+            record_data = dialog.get_record_data()
+            # TODO: добавить запись в таблицу
