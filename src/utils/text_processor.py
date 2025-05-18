@@ -38,4 +38,4 @@ class TextProcessor:
         for i, col in enumerate(columns):
             if TextProcessor.normalize(str(col)) in [TextProcessor.normalize(n) for n in num_col_names]:
                 return i
-        return None
+        return None     

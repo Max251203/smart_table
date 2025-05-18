@@ -92,4 +92,4 @@ class SmartHeader(QHeaderView):
 
     def sizeHint(self):
         baseSize = super().sizeHint()
-        return baseSize.expandedTo(QSize(0, 30))
+        return baseSize.expandedTo(QSize(0, 30))     

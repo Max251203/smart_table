@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
-                               QLabel, QTextEdit, QPushButton, 
-                               QScrollArea, QWidget)
-from PySide6.QtCore import Qt, QSize
+                             QLabel, QTextEdit, QPushButton, 
+                             QScrollArea, QWidget)
+from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon
 from typing import List, Dict, Set
-from ui.components.custom_combobox import SmartComboBox  # Используем SmartComboBox
+from ui.components.custom_combobox import SmartComboBox
 
 class RecordDialog(QDialog):
     def __init__(self, columns: List[str], parent=None, record_data: Dict[str, str] = None, 
@@ -22,8 +22,22 @@ class RecordDialog(QDialog):
         self.column_values = column_values or {}
         self.work_place_groups = work_place_groups or {}
         self.field_widgets = {}
+        self.current_focus_widget = None
         
         self._init_ui()
+        
+    def keyPressEvent(self, event):
+        """Предотвращаем закрытие диалога по Enter"""
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            # Не закрываем диалог по Enter - игнорируем событие
+            return
+        super().keyPressEvent(event)
+        
+    def eventFilter(self, obj, event):
+        """Фильтр событий для отслеживания фокуса на полях"""
+        if event.type() == QEvent.FocusIn:
+            self.current_focus_widget = obj
+        return False
         
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -60,7 +74,7 @@ class RecordDialog(QDialog):
             label.setWordWrap(True)
             field_layout.addWidget(label)
             
-            # Определяем тип поля и размеры на основе данных
+            # Определяем тип поля на основе анализа фактического объема текста
             is_long_text = self._is_long_text(column)
             
             if is_long_text:
@@ -79,42 +93,53 @@ class RecordDialog(QDialog):
                 else:
                     field.setMinimumHeight(60)
                     field.setMaximumHeight(80)
+                    
+                # Заполняем данными при редактировании
+                if self.record_data and column in self.record_data:
+                    field.setPlainText(self.record_data[column])
             else:
-                # Вместо LineEdit используем SmartComboBox для всех полей
-                field = SmartComboBox()
+                # Используем SmartComboBox для всех полей
+                field = SmartComboBox(editable=True)  # Явно указываем редактируемость
                 field.setObjectName("recordComboBox")
-                field.setEditable(True)  # Делаем редактируемым
+                field.installEventFilter(self)  # Устанавливаем фильтр событий для отслеживания фокуса
+                
+                # Настраиваем размер поля на основе анализа контента
+                field_size = self._get_field_size(column)
+                field.setMinimumWidth(field_size["width"])
+                field.setMinimumHeight(field_size["height"])
+                
+                # Собираем все возможные значения для поля
+                all_values = set()
                 
                 # Специальная обработка для поля места работы/учёбы
                 is_workplace_field = "место работы" in column.lower() or "учёбы" in column.lower()
                 
                 if is_workplace_field and column in self.work_place_groups:
-                    # Добавляем все группы в комбобокс
-                    all_items = set()
+                    # Собираем все группы и их значения
                     groups = self.work_place_groups[column]
                     
-                    # Сначала добавляем ключи групп
-                    field.addItems(sorted(groups.keys()))
-                    
-                    # Собираем все значения для автодополнения
+                    # Добавляем ключи групп и их значения
                     for key, values in groups.items():
-                        all_items.add(key)
-                        all_items.update(values)
+                        all_values.add(key)
+                        all_values.update(values)
+                
+                # Добавляем значения из колонки для всех полей
+                if column in self.column_values:
+                    all_values.update(self.column_values[column])
                     
-                    # Также добавляем все уникальные значения из колонки
-                    if column in self.column_values:
-                        all_items.update(self.column_values[column])
-                        
-                # Стандартное заполнение для других полей
-                elif column in self.column_values and self.column_values[column]:
-                    field.addItems(sorted(self.column_values[column]))
-            
-            # Если есть данные для редактирования, заполняем поле
-            if self.record_data and column in self.record_data:
-                if isinstance(field, SmartComboBox):
+                # Настраиваем комбобокс с явным указанием редактируемости
+                sorted_values = sorted(list(all_values)) if all_values else []
+                if sorted_values:
+                    field.setup(sorted_values, editable=True)
+                else:
+                    # Гарантируем, что у списка будет хотя бы один элемент
+                    field.addItem("")
+                
+                # Заполняем данными при редактировании
+                if self.record_data and column in self.record_data:
                     field.setCurrentText(self.record_data[column])
                 else:
-                    field.setPlainText(self.record_data[column])
+                    field.setCurrentText("")
             
             field_layout.addWidget(field)
             form_layout.addWidget(field_container)
@@ -140,16 +165,76 @@ class RecordDialog(QDialog):
         main_layout.addLayout(button_layout)
     
     def _is_long_text(self, column: str) -> bool:
-        """Определяет, нужно ли для колонки использовать многострочное поле."""
-        long_text_indicators = ["комментарий", "описание", "адрес", "примечание"]
+        """Определяет, нужно ли для колонки использовать многострочное поле.
         
-        # Проверяем название колонки
-        if any(indicator in column.lower() for indicator in long_text_indicators):
+        Теперь мы анализируем фактический объем текста в данных колонки,
+        а не только название или длину текста в ячейках.
+        """
+        # Проверим, не является ли колонка явно многострочной по названию
+        long_text_indicators = ["комментарий", "описание", "примечание"]
+        if any(indicator == column.lower() for indicator in long_text_indicators):
             return True
         
-        # Проверяем длину текста в колонке
+        # Теперь анализируем данные
         max_length = self.column_max_lengths.get(column, 0)
-        return max_length > 50 or len(column) > 30
+        
+        # Если максимальная длина текста в колонке очень большая - делаем многострочным
+        if max_length > 150:
+            return True
+            
+        # Если в колонке есть слово "адрес" и большая длина - тоже многострочное
+        if "адрес" in column.lower() and max_length > 50:
+            return True
+            
+        # В других случаях предпочитаем использовать SmartComboBox
+        # Делаем поле многострочным только если текст действительно значительный
+        return False
+    
+    def _get_field_size(self, column: str) -> Dict[str, int]:
+        """Определяет оптимальный размер поля на основе данных."""
+        # По умолчанию стандартный размер
+        result = {
+            "width": 250,
+            "height": 32
+        }
+        
+        # Получаем максимальную длину текста в колонке
+        max_length = self.column_max_lengths.get(column, 0)
+        
+        # Определяем размер на основе длины контента
+        if max_length > 40:
+            # Для очень длинных значений
+            result["width"] = 400
+            result["height"] = 35
+        elif max_length > 25:
+            # Для средних значений
+            result["width"] = 350
+            result["height"] = 35
+        elif max_length > 15:
+            # Для коротких значений
+            result["width"] = 300
+            result["height"] = 32
+        else:
+            # Для совсем коротких значений
+            result["width"] = 250
+            result["height"] = 32
+        
+        # Учитываем тип данных по названию колонки
+        column_lower = column.lower()
+        
+        # Поля, которые обычно содержат длинные значения
+        if "имя" in column_lower or "фамилия" in column_lower or "название" in column_lower:
+            result["width"] = max(result["width"], 350)
+        
+        # Поля, которые обычно имеют сложную структуру
+        if "должность" in column_lower or "статус" in column_lower:
+            result["width"] = max(result["width"], 300)
+            
+        # Поля, которые обычно короткие
+        if "дата" in column_lower or "возраст" in column_lower or "пол" in column_lower:
+            result["width"] = min(result["width"], 250)
+            
+        return result
     
     def get_record_data(self) -> Dict[str, str]:
         """Возвращает данные, введенные пользователем."""

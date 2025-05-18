@@ -70,4 +70,4 @@ class SimilarityAnalyzer:
                 continue
             representative = min(group, key=len)
             results[representative] = set(group)
-        return results
+        return results     

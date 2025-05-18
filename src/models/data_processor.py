@@ -11,18 +11,73 @@ class DataProcessor:
         self.grouper = SmartGrouper("resources/seed_groups.json")
         self.current_df: Optional[pd.DataFrame] = None
         self.similar_groups: Dict[str, set] = {}
+        self.excel_num_column_added = False  # Флаг, указывающий, добавили ли мы сами колонку Excel #
 
     def load_excel(self, file_path: str) -> Tuple[pd.DataFrame, int]:
         df = pd.read_excel(file_path)
         num_col_index = self.text_processor.find_num_column(df.columns)
         if num_col_index is None:
+            # Добавляем колонку Excel # и устанавливаем флаг
             df.insert(0, "Excel #", df.index + 2)
             num_col_index = 0
+            self.excel_num_column_added = True
+        else:
+            # Колонка с номерами уже есть в файле
+            self.excel_num_column_added = False
+            
         df = df.fillna("")
         for col in df.columns:
             df[col] = df[col].astype(str)
         self.current_df = df
         return df, num_col_index
+
+    def save_excel(self, file_path: str) -> bool:
+        """Сохраняет текущий DataFrame в Excel-файл."""
+        if self.current_df is None:
+            return False
+            
+        try:
+            df_to_save = self.current_df.copy()
+            
+            # Удаляем временную колонку Excel #, если она была добавлена нами
+            if self.excel_num_column_added and "Excel #" in df_to_save.columns:
+                df_to_save = df_to_save.drop(columns=["Excel #"])
+            
+            # Сохраняем без индекса
+            df_to_save.to_excel(file_path, index=False)
+            return True
+        except Exception as e:
+            print(f"Ошибка при сохранении файла: {e}")
+            return False
+
+    def add_record(self, record_data: Dict[str, str]) -> None:
+        """Добавляет новую запись в текущий DataFrame."""
+        if self.current_df is None:
+            return
+            
+        # Создаем новую строку
+        new_row = pd.Series(record_data, index=self.current_df.columns)
+        
+        # Если мы добавляли колонку Excel #, назначаем следующий номер
+        if self.excel_num_column_added and "Excel #" in self.current_df.columns:
+            try:
+                # Находим максимальный текущий номер
+                max_num = 0
+                for val in self.current_df["Excel #"]:
+                    try:
+                        num = int(float(val))
+                        max_num = max(max_num, num)
+                    except:
+                        pass
+                
+                # Следующий номер
+                new_row["Excel #"] = str(max_num + 1)
+            except:
+                # В случае ошибки используем номер len + 2 (как в Excel)
+                new_row["Excel #"] = str(len(self.current_df) + 2)
+        
+        # Добавляем строку в DataFrame
+        self.current_df = pd.concat([self.current_df, pd.DataFrame([new_row])], ignore_index=True)
 
     def analyze_column(self, column_name: str) -> Dict[str, set]:
         if self.current_df is None:

@@ -1,5 +1,4 @@
 from PySide6.QtCore import QObject, QRunnable, Signal, QThreadPool, Qt
-from PySide6.QtWidgets import QCompleter  # Добавляем импорт
 from models.data_processor import DataProcessor
 from controllers.table_controller import TableController
 from ui.components.custom_combobox import SmartComboBox
@@ -34,10 +33,13 @@ class FilterController(QObject):
         self.threadpool.setMaxThreadCount(4)
         self.current_filter_worker = None
         self.data_processor = self.table_controller.data_processor
+        
+        # Устанавливаем поле выбора колонки нередактируемым
+        self.column_box.setEditable(False)
 
     def update_columns(self, columns: list):
-        self.column_box.clear()
-        self.column_box.addItems(columns)
+        # Обновляем список колонок и делаем поле нередактируемым
+        self.column_box.setup(columns, editable=False)
 
     def is_numeric_column(self, values):
         """Проверяет, являются ли значения числовыми (целыми или с плавающей точкой)."""
@@ -49,48 +51,33 @@ class FilterController(QObject):
             return False
 
     def on_column_change(self, index: int):
+        # Очищаем поле ключевых слов
         self.keyword_edit.clear()
         if index < 0:
             return
 
         column_name = self.column_box.currentText()
         
-        # Сначала устанавливаем режим редактирования
-        self.keyword_edit.setEditable(True)
-        
         # Специальная обработка для места работы (учёбы)
         if "место работы" in column_name.lower() or "учёбы" in column_name.lower():
             try:
                 similar_groups = self.data_processor.analyze_column(column_name)
                 
-                # Добавляем в комбобокс только ключи групп
-                self.keyword_edit.addItems(sorted(similar_groups.keys()))
-                
-                # Собираем все возможные варианты для автодополнения
-                all_values = set()
+                # Собираем все возможные значения
+                all_values = []
                 for key, values in similar_groups.items():
-                    all_values.add(key)
-                    all_values.update(values)
+                    all_values.append(key)
+                    all_values.extend(values)
                 
-                # Устанавливаем комплитер
-                if self.keyword_edit.isEditable():
-                    completer = QCompleter(sorted(list(all_values)))
-                    completer.setCaseSensitivity(Qt.CaseInsensitive)
-                    completer.setFilterMode(Qt.MatchContains)
-                    self.keyword_edit.setCompleter(completer)
+                # Настраиваем комбобокс ключевых слов
+                self.keyword_edit.setup(sorted(all_values))
                 
             except Exception as e:
                 print(f"Ошибка при анализе колонки: {e}")
-                # Если ошибка, обрабатываем как обычную колонку
+                # Если ошибка, просто добавляем уникальные значения
                 values = self.table_controller.get_column_values(column_name)
-                self.keyword_edit.addItems(sorted(str(v).strip() for v in values if str(v).strip()))
-                
-                # Стандартный комплитер
-                if self.keyword_edit.isEditable():
-                    completer = QCompleter([str(v).strip() for v in values if str(v).strip()])
-                    completer.setCaseSensitivity(Qt.CaseInsensitive)
-                    completer.setFilterMode(Qt.MatchContains)
-                    self.keyword_edit.setCompleter(completer)
+                unique_values = sorted(set([str(v).strip() for v in values if str(v).strip()]))
+                self.keyword_edit.setup(unique_values)
         else:
             values = self.table_controller.get_column_values(column_name)
             # Определяем: нужно ли сортировать численно?
@@ -101,34 +88,13 @@ class FilterController(QObject):
                     )
                     # Оставим отображение в исходном виде (без .0 если целое)
                     display_values = [str(int(v)) if float(v).is_integer() else str(v) for v in numeric_values]
-                    self.keyword_edit.addItems(display_values)
-                    
-                    # Стандартный комплитер
-                    if self.keyword_edit.isEditable():
-                        completer = QCompleter(display_values)
-                        completer.setCaseSensitivity(Qt.CaseInsensitive)
-                        completer.setFilterMode(Qt.MatchContains)
-                        self.keyword_edit.setCompleter(completer)
+                    self.keyword_edit.setup(display_values)
                 except Exception:
-                    filtered_values = sorted(str(v).strip() for v in values if str(v).strip())
-                    self.keyword_edit.addItems(filtered_values)
-                    
-                    # Стандартный комплитер
-                    if self.keyword_edit.isEditable():
-                        completer = QCompleter(filtered_values)
-                        completer.setCaseSensitivity(Qt.CaseInsensitive)
-                        completer.setFilterMode(Qt.MatchContains)
-                        self.keyword_edit.setCompleter(completer)
+                    filtered_values = sorted([str(v).strip() for v in values if str(v).strip()])
+                    self.keyword_edit.setup(filtered_values)
             else:
-                filtered_values = sorted(str(v).strip() for v in values if str(v).strip())
-                self.keyword_edit.addItems(filtered_values)
-                
-                # Стандартный комплитер
-                if self.keyword_edit.isEditable():
-                    completer = QCompleter(filtered_values)
-                    completer.setCaseSensitivity(Qt.CaseInsensitive)
-                    completer.setFilterMode(Qt.MatchContains)
-                    self.keyword_edit.setCompleter(completer)
+                filtered_values = sorted([str(v).strip() for v in values if str(v).strip()])
+                self.keyword_edit.setup(filtered_values)
 
     def apply_filter(self):
         if self.current_filter_worker is not None:

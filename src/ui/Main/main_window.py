@@ -132,29 +132,42 @@ class MainWindow(QMainWindow):
                 )
 
     def _toggle_search_panel(self):
-        # Если нажата кнопка закрепления, панель не скрывается
         if self._search_panel_pinned:
             return
-            
+
         is_visible = self.ui.searchPanelContainer.isVisible()
-        
-        # Создаем анимацию показа/скрытия панели
+
         self.ui.searchPanelContainer.setVisible(True)
         self.animation = QPropertyAnimation(self.ui.searchPanelContainer, b"maximumHeight")
         self.animation.setDuration(200)
-        
+
         if is_visible:
             self.animation.setStartValue(60)
             self.animation.setEndValue(0)
-            self.animation.finished.connect(lambda: self.ui.searchPanelContainer.setVisible(False))
+            self.animation.finished.connect(lambda: self._on_search_panel_hidden())
         else:
             self.animation.setStartValue(0)
             self.animation.setEndValue(60)
-            
+            self.animation.finished.connect(self._update_search_button_state)
+
         self.animation.start()
-        
-        # Обновляем состояние кнопки поиска
+
+    def _on_search_panel_hidden(self):
+        self.ui.searchPanelContainer.setVisible(False)
         self._update_search_button_state()
+
+    def _update_search_button_state(self):
+        is_visible = self.ui.searchPanelContainer.isVisible()
+        if is_visible:
+            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_up.png"))
+            self.ui.btnSmartSearch.setObjectName("btnSmartSearchActive")
+        else:
+            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_down.png"))
+            self.ui.btnSmartSearch.setObjectName("btnSmartSearch")
+
+        self.ui.btnSmartSearch.style().unpolish(self.ui.btnSmartSearch)
+        self.ui.btnSmartSearch.style().polish(self.ui.btnSmartSearch)
+        self.ui.btnSmartSearch.update()
 
     def _toggle_pin_search_panel(self, checked):
         self._search_panel_pinned = checked
@@ -174,24 +187,7 @@ class MainWindow(QMainWindow):
         # Обновляем состояние кнопки поиска
         self._update_search_button_state()
 
-    def _update_search_button_state(self):
-        """Обновляет визуальное состояние кнопки умного поиска"""
-        is_visible = self.ui.searchPanelContainer.isVisible()
-        
-        if is_visible:
-            # Если панель видима - меняем иконку на стрелку вверх
-            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_up.png"))
-            self.ui.btnSmartSearch.setObjectName("btnSmartSearchActive")
-        else:
-            # Если панель скрыта - стрелка вниз
-            self.ui.btnSmartSearch.setIcon(QIcon(":/icon/icons/arrow_down.png"))
-            self.ui.btnSmartSearch.setObjectName("btnSmartSearch")
-        
-        # Перерисовываем кнопку чтобы применить новые стили
-        self.ui.btnSmartSearch.style().unpolish(self.ui.btnSmartSearch)
-        self.ui.btnSmartSearch.style().polish(self.ui.btnSmartSearch)
-        self.ui.btnSmartSearch.update()
-
+    # Метод для добавления записи в MainWindow
     def _show_add_record_dialog(self):
         if self.table_controller.model is None:
             QMessageBox.warning(self, "Предупреждение", "Сначала загрузите Excel файл.")
@@ -241,6 +237,35 @@ class MainWindow(QMainWindow):
         
         if dialog.exec():
             # Получаем данные из диалога и добавляем их в таблицу
-            # Эта функциональность будет реализована позже
             record_data = dialog.get_record_data()
-            # TODO: добавить запись в таблицу
+            
+            # Проверяем, что есть хотя бы одно непустое поле
+            has_data = False
+            for value in record_data.values():
+                if value and value.strip():
+                    has_data = True
+                    break
+                    
+            if not has_data:
+                QMessageBox.warning(
+                    self, 
+                    "Пустая запись", 
+                    "Невозможно добавить полностью пустую запись. Введите хотя бы одно значение."
+                )
+                return
+                
+            # Добавляем запись
+            success = self.table_controller.add_record(record_data)
+            
+            if success:
+                QMessageBox.information(
+                    self, 
+                    "Запись добавлена", 
+                    "Новая запись успешно добавлена в таблицу и сохранена в Excel-файл."
+                )
+            else:
+                QMessageBox.warning(
+                    self, 
+                    "Ошибка", 
+                    "Не удалось добавить запись. Проверьте доступность Excel-файла для записи."
+                )

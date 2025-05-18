@@ -37,4 +37,4 @@ class SmartGrouper:
         for rep, group in sim_groups.items():
             result[rep] = group
 
-        return result
+        return result    

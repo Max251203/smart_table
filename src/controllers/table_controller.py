@@ -1,9 +1,11 @@
 from typing import List, Optional, Dict
 from PySide6.QtCore import QObject, Qt
+from PySide6.QtWidgets import QMessageBox, QPushButton
 from models.table_model import SmartTableModel
 from models.data_processor import DataProcessor
 from ui.components.table_view import SmartTableView
 import pandas as pd
+import os
 
 class TableController(QObject):
     def __init__(self, view: SmartTableView):
@@ -13,6 +15,7 @@ class TableController(QObject):
         self.model: Optional[SmartTableModel] = None
         self.num_mode = "excel"
         self.num_col_index = 0
+        self.current_file_path = None
 
     def load_file(self, file_path: str) -> bool:
         try:
@@ -22,6 +25,7 @@ class TableController(QObject):
             self.model = SmartTableModel(df, self.num_mode, self.num_col_index)
             self.view.setModel(self.model)
             self.view.adjust_columns()
+            self.current_file_path = file_path
             return True
         except Exception as e:
             print(f"Ошибка при загрузке файла: {e}")
@@ -108,3 +112,130 @@ class TableController(QObject):
             return result
         except:
             return {}
+
+    def add_record(self, record_data: Dict[str, str]) -> bool:
+        """Добавляет новую запись в таблицу и сохраняет в Excel-файл."""
+        if self.model is None or self.data_processor.current_df is None:
+            return False
+            
+        try:
+            # Сохраняем копию текущего DataFrame перед изменениями
+            original_df = self.data_processor.current_df.copy()
+            
+            # Создаем новую запись
+            new_record = {}
+            
+            # Заполняем все колонки из dataframe
+            for col in self.data_processor.current_df.columns:
+                if col in record_data:
+                    new_record[col] = record_data[col]
+                else:
+                    # Пропускаем Excel # - она будет автоматически назначена
+                    if col.lower() in ["excel #", "№", "№ (порядок)"]:
+                        new_record[col] = ""
+                    else:
+                        new_record[col] = ""
+            
+            # Добавляем запись в DataFrame
+            self.data_processor.add_record(new_record)
+            
+            # Пытаемся сохранить изменения в Excel-файл
+            if self.current_file_path:
+                save_result = self.save_to_excel()
+                if not save_result:
+                    # Если сохранение не удалось, возвращаем DataFrame в исходное состояние
+                    self.data_processor.current_df = original_df
+                    self.model.set_dataframe(original_df)
+                    self.view.adjust_columns()
+                    return False
+            
+            # Если всё прошло успешно или не требовалось сохранение, обновляем модель
+            self.model.set_dataframe(self.data_processor.current_df)
+            self.view.adjust_columns()
+            return True
+            
+        except Exception as e:
+            print(f"Ошибка при добавлении записи: {e}")
+            return False
+            
+    def save_to_excel(self) -> bool:
+        """Сохраняет текущие данные в Excel-файл."""
+        if self.model is None or self.data_processor.current_df is None or not self.current_file_path:
+            return False
+            
+        try:
+            # Создаем временное имя файла
+            file_dir = os.path.dirname(self.current_file_path)
+            file_name = os.path.basename(self.current_file_path)
+            temp_file = os.path.join(file_dir, f"~temp_{file_name}")
+            
+            # Сохраняем во временный файл
+            self.data_processor.save_excel(temp_file)
+            
+            # Проверяем, что файл создан
+            if not os.path.exists(temp_file):
+                return False
+                
+            # Если оригинальный файл заблокирован, спрашиваем что делать
+            try:
+                # Пробуем заменить оригинальный файл
+                if os.path.exists(self.current_file_path):
+                    os.replace(temp_file, self.current_file_path)
+                else:
+                    os.rename(temp_file, self.current_file_path)
+                return True
+            except PermissionError:
+                # Если файл заблокирован (открыт в Excel и т.д.)
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Warning)
+                msg.setText("Файл Excel заблокирован для записи!")
+                msg.setInformativeText(f"Не удается сохранить изменения в '{file_name}'. Возможно, файл открыт в Excel. Закройте файл и повторите попытку.")
+                msg.setWindowTitle("Ошибка сохранения")
+                
+                # Создаем кнопки и устанавливаем им objectName для стилизации через QSS
+                save_as_btn = QPushButton("Сохранить как...")
+                save_as_btn.setObjectName("saveAsButton")
+                
+                retry_btn = QPushButton("Повторить")
+                retry_btn.setObjectName("retryButton")
+                
+                cancel_btn = QPushButton("Отмена")
+                cancel_btn.setObjectName("cancelButton")
+                
+                msg.addButton(save_as_btn, QMessageBox.ActionRole)
+                msg.addButton(retry_btn, QMessageBox.ActionRole)
+                msg.addButton(cancel_btn, QMessageBox.RejectRole)
+                
+                msg.exec()
+                
+                clicked_btn = msg.clickedButton()
+                
+                if clicked_btn == retry_btn:
+                    # Пробуем снова
+                    return self.save_to_excel()
+                elif clicked_btn == save_as_btn:
+                    # Сохраняем с новым именем
+                    from PySide6.QtWidgets import QFileDialog
+                    new_path, _ = QFileDialog.getSaveFileName(
+                        None, 
+                        "Сохранить как", 
+                        self.current_file_path,
+                        "Excel Files (*.xlsx *.xls)"
+                    )
+                    if new_path:
+                        self.data_processor.save_excel(new_path)
+                        self.current_file_path = new_path
+                        return True
+                
+                # Удаляем временный файл, если он все еще существует
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except:
+                        pass
+                        
+                return False
+                
+        except Exception as e:
+            print(f"Ошибка при сохранении файла: {e}")
+            return False

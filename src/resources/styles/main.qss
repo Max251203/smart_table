@@ -3,6 +3,7 @@ QWidget {
     font-size: 15px;
 }
 
+/* Базовые стили для всех кнопок - добавляем правило для фокуса */
 QPushButton {
     padding: 6px 18px;
     border-radius: 5px;
@@ -13,6 +14,13 @@ QPushButton {
     border: none;
     min-width: 90px;
     margin-right: 6px;
+    outline: none; /* Убираем контур */
+}
+
+/* Убираем пунктирную рамку при фокусе */
+QPushButton:focus {
+    outline: none;
+    border: none;
 }
 
 QPushButton:hover {
@@ -21,6 +29,34 @@ QPushButton:hover {
 }
 
 QPushButton:pressed {
+    background: #154360;
+    outline: none; /* Дополнительно убираем контур при нажатии */
+}
+
+/* Кнопки диалога сохранения файла */
+#saveAsButton, #retryButton, #cancelButton {
+    padding: 6px 18px;
+    border-radius: 5px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #5dade2, stop:1 #2e86c1);
+    color: white;
+    font-weight: 600;
+    border: none;
+    min-width: 120px;
+    margin-right: 6px;
+    outline: none;
+}
+
+#saveAsButton {
+    min-width: 150px; /* Чуть шире для "Сохранить как..." */
+}
+
+#saveAsButton:hover, #retryButton:hover, #cancelButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #5499c7, stop:1 #2471a3);
+}
+
+#saveAsButton:pressed, #retryButton:pressed, #cancelButton:pressed {
     background: #154360;
 }
 
@@ -34,6 +70,12 @@ QPushButton:pressed {
     max-height: 32px;
     padding: 0;
     margin: 0;
+    outline: none; /* Убираем контур */
+}
+
+#pinButton:focus {
+    outline: none;
+    border: none;
 }
 
 #pinButton:hover {
@@ -56,6 +98,18 @@ QPushButton:pressed {
     border: none;
     min-width: 90px;
     margin-right: 6px;
+    outline: none; /* Убираем контур */
+}
+
+/* Добавляем hover для активной кнопки умного поиска */
+#btnSmartSearchActive:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #5499c7, stop:1 #2471a3);
+}
+
+#btnSmartSearchActive:focus {
+    outline: none;
+    border: none;
 }
 
 /* Кнопка поиска в панели - как обычная кнопка */
@@ -178,13 +232,17 @@ QHeaderView::section {
 #recordCancelButton, #recordSaveButton {
     min-width: 120px;
     min-height: 35px;
+    outline: none; /* Убираем контур */
+}
+
+#recordCancelButton:focus, #recordSaveButton:focus {
+    outline: none;
+    border: none;
 }
 
 #recordSaveButton {
-    min-width: 150px;
+    min-width: 200px; /* Увеличиваем ширину кнопки "Сохранить" */
 }
-
-/* Добавьте эти стили в main.qss */
 
 #recordComboBox {
     border: 1px solid #bbb;
