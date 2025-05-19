@@ -21,6 +21,13 @@ class SimilarityAnalyzer:
             ngram_range=(1, 2),
             min_df=1
         )
+        
+        # Предопределенные группы для университетов
+        self.university_patterns = {
+            r'(?:уо\s+)?(?:[«"])?ггу(?:[»"])?\b|(?:уо\s+)?(?:[«"])?г(?:омельский)?\s*г(?:осударственный)?\s*у(?:ниверситет)?(?:[»"])?\b|(?:университет|унив)\s+(?:им\.?|имени)\s+(?:ф\.?\s*)?скорин': 'Гомельский государственный университет имени Франциска Скорины',
+            r'(?:уо\s+)?(?:[«"])?ггту(?:[»"])?\b|(?:уо\s+)?(?:[«"])?г(?:омельский)?\s*г(?:осударственный)?\s*т(?:ехнический)?\s*у(?:ниверситет)?(?:[»"])?\b|(?:университет|унив)\s+(?:им\.?|имени)\s+(?:п\.?о\.?\s*)?сух': 'Гомельский государственный технический университет имени П.О. Сухого',
+            r'(?:уо\s+)?(?:[«"])?гомгму(?:[»"])?\b|(?:уо\s+)?(?:[«"])?г(?:омельский)?\s*(?:г(?:осударственный)?)?\s*мед(?:ицинский)?\s*у(?:ниверситет)?(?:[»"])?': 'Гомельский государственный медицинский университет'
+        }
     
     def find_similar_groups(self, texts: List[str]) -> Dict[str, Set[str]]:
         """Находит группы схожих текстов без привязки к конкретным данным"""
@@ -34,26 +41,34 @@ class SimilarityAnalyzer:
         if len(original_texts) <= 1:
             return {original_texts[0]: set(original_texts)} if original_texts else {}
         
+        # Шаг 0: Применяем предопределенные паттерны университетов
+        university_groups = self._apply_university_patterns(original_texts)
+        
         # Шаг 1: Группируем тексты, которые идентичны после нормализации
         norm_groups = self._group_by_normalized_text(original_texts)
         
         # Шаг 2: Ищем и группируем аббревиатуры и их расшифровки
         abbr_groups = self._find_abbreviation_groups(original_texts)
         
-        # Шаг 3: Для оставшихся текстов применяем TF-IDF анализ
+        # Шаг 3: Для оставшихся текстов применяем анализ схожести
         used_texts = set()
-        for groups in [norm_groups, abbr_groups]:
+        for groups in [university_groups, norm_groups, abbr_groups]:
             for group in groups.values():
                 used_texts.update(group)
         
         remaining_texts = [t for t in original_texts if t not in used_texts]
         
-        # Применяем TF-IDF анализ к оставшимся текстам
-        tfidf_groups = self._analyze_with_tfidf(remaining_texts)
+        # Применяем анализ схожести к оставшимся текстам
+        similarity_groups = {}
+        if remaining_texts:
+            try:
+                similarity_groups = self._analyze_with_similarity(remaining_texts)
+            except Exception as e:
+                print(f"Ошибка при анализе схожести: {e}")
         
         # Объединяем результаты всех методов
         all_groups = []
-        for groups in [norm_groups, abbr_groups, tfidf_groups]:
+        for groups in [university_groups, norm_groups, abbr_groups, similarity_groups]:
             all_groups.extend([(rep, group) for rep, group in groups.items()])
         
         # Объединяем пересекающиеся группы
@@ -69,6 +84,20 @@ class SimilarityAnalyzer:
                 merged_groups[text] = {text}
         
         return merged_groups
+    
+    def _apply_university_patterns(self, texts: List[str]) -> Dict[str, Set[str]]:
+        """Применяет предопределенные паттерны для университетов"""
+        result = {}
+        for pattern, representative in self.university_patterns.items():
+            group = set()
+            for text in texts:
+                if re.search(pattern, text.lower()):
+                    group.add(text)
+            
+            if len(group) > 1:
+                result[representative] = group
+        
+        return result
     
     def _group_by_normalized_text(self, texts: List[str]) -> Dict[str, Set[str]]:
         """Группирует тексты, которые становятся идентичными после нормализации"""
@@ -163,24 +192,31 @@ class SimilarityAnalyzer:
             if 2 <= len(abbr) <= 10:
                 return True
         
+        # Паттерн 6: Начинается с УО или ГУО (учреждение образования)
+        if text.upper().startswith(('УО ', 'ГУО ')):
+            # Проверяем, есть ли после УО/ГУО что-то похожее на аббревиатуру
+            rest = text[3:].strip().strip('"\'')
+            if rest and (rest.isupper() or re.match(r'^[A-ZА-Я]{2,}', rest)):
+                return True
+        
         return False
     
     def _is_expansion_of_abbreviation(self, full_text: str, abbr: str) -> bool:
         """Проверяет, является ли текст расшифровкой аббревиатуры (универсальный алгоритм)"""
-        full_text_lower = full_text.lower()
-        abbr_lower = abbr.lower()
+        full_text = str(full_text).lower()
+        abbr = str(abbr).lower()
         
         # Очищаем аббревиатуру от не-буквенных символов
-        abbr_clean = ''.join(c for c in abbr_lower if c.isalnum())
+        abbr_clean = ''.join(c for c in abbr if c.isalnum())
         if not abbr_clean:
             return False
         
         # Проверка 1: Аббревиатура содержится в тексте как отдельное слово
-        if re.search(fr'\b{re.escape(abbr_lower)}\b', full_text_lower):
+        if re.search(fr'\b{re.escape(abbr)}\b', full_text):
             return True
         
         # Проверка 2: Первые буквы слов в тексте образуют аббревиатуру
-        words = re.findall(r'\b\w+\b', full_text_lower)
+        words = re.findall(r'\b\w+\b', full_text)
         if words:
             # Получаем первые буквы всех слов
             first_letters = ''.join(word[0] for word in words if word)
@@ -190,7 +226,10 @@ class SimilarityAnalyzer:
                 return True
             
             # Проверяем, содержатся ли первые буквы значимых слов в аббревиатуре
-            significant_words = [w for w in words if len(w) > 3]
+            # Игнорируем короткие предлоги и союзы
+            ignore_words = {'и', 'в', 'на', 'с', 'по', 'для', 'при', 'им', 'имени', 'of', 'the', 'a', 'an'}
+            significant_words = [w for w in words if w not in ignore_words]
+            
             if significant_words:
                 sig_letters = ''.join(word[0] for word in significant_words)
                 
@@ -199,72 +238,49 @@ class SimilarityAnalyzer:
                     return True
         
         # Проверка 3: Последовательные символы аббревиатуры содержатся в тексте
+        # Улучшенный алгоритм для поиска последовательных символов
         char_positions = []
         last_pos = -1
         
         for char in abbr_clean:
-            pos = full_text_lower.find(char, last_pos + 1)
+            pos = full_text.find(char, last_pos + 1)
             if pos > last_pos:
                 char_positions.append(pos)
                 last_pos = pos
             else:
-                break
-                
+                # Пробуем найти с начала, если не нашли после последней позиции
+                pos = full_text.find(char)
+                if pos >= 0 and pos not in char_positions:
+                    char_positions.append(pos)
+                    last_pos = pos
+                else:
+                    break
+                    
         if len(char_positions) == len(abbr_clean):
-            # Все символы аббревиатуры найдены в правильном порядке
+            # Все символы аббревиатуры найдены
             return True
         
+        # Проверка 4: Специфичная для образовательных учреждений
+        # Проверяем наличие ключевых слов "университет", "институт" и т.д.
+        edu_keywords = {'университет', 'институт', 'академия', 'колледж', 'школа', 'лицей', 'гимназия'}
+        has_edu_keyword = any(kw in full_text for kw in edu_keywords)
+        
+        if has_edu_keyword and len(abbr_clean) >= 3:
+            # Проверяем, содержит ли полный текст части аббревиатуры
+            abbr_parts = []
+            for i in range(len(abbr_clean) - 1):
+                abbr_parts.append(abbr_clean[i:i+2])
+            
+            matching_parts = sum(1 for part in abbr_parts if part in full_text)
+            if matching_parts >= len(abbr_parts) * 0.7:  # 70% совпадение
+                return True
+        
         return False
-    
-    def _analyze_with_tfidf(self, texts: List[str]) -> Dict[str, Set[str]]:
-        """Анализирует тексты с помощью TF-IDF для поиска схожих групп"""
-        if not texts:
-            return {}
-            
-        try:
-            # Подготавливаем тексты для анализа
-            processed_texts = [self._preprocess_for_tfidf(t) for t in texts]
-            
-            # Получаем TF-IDF матрицу для символьных n-грамм
-            char_tfidf = self.char_vectorizer.fit_transform(processed_texts)
-            char_similarity = char_tfidf.dot(char_tfidf.T).toarray()
-            
-            # Получаем TF-IDF матрицу для словесных n-грамм
-            try:
-                word_tfidf = self.word_vectorizer.fit_transform(processed_texts)
-                word_similarity = word_tfidf.dot(word_tfidf.T).toarray()
-                
-                # Комбинируем матрицы сходства
-                similarity_matrix = 0.7 * char_similarity + 0.3 * word_similarity
-            except:
-                # Если возникла ошибка, используем только символьную матрицу
-                similarity_matrix = char_similarity
-            
-            # Создаем граф схожести
-            similarity_graph = similarity_matrix > self.similarity_threshold
-            
-            # Находим компоненты связности
-            components = self._find_connected_components(similarity_graph)
-            
-            # Преобразуем компоненты в группы текстов
-            result = {}
-            for component in components:
-                if len(component) > 1:
-                    # Собираем тексты для этой компоненты
-                    group_texts = set(texts[i] for i in component)
-                    
-                    # Выбираем представителя группы
-                    representative = self._select_representative(group_texts)
-                    result[representative] = group_texts
-            
-            return result
-        except Exception as e:
-            print(f"Ошибка при TF-IDF анализе: {e}")
-            return {}
     
     def _preprocess_for_tfidf(self, text: str) -> str:
         """Предобрабатывает текст для TF-IDF анализа"""
         # Базовая нормализация
+        text = str(text)
         text = self.text_processor.normalize(text)
         
         # Удаляем общие слова, которые не несут специфической информации
@@ -280,6 +296,52 @@ class SimilarityAnalyzer:
         text = re.sub(r'\s+', ' ', text).strip()
         
         return text
+    
+    def _analyze_with_similarity(self, texts: List[str]) -> Dict[str, Set[str]]:
+        """Анализирует тексты с помощью прямого расчета сходства"""
+        if not texts or len(texts) < 2:
+            return {}
+            
+        try:
+            # Предобработка текстов
+            processed_texts = [str(self._preprocess_for_tfidf(t)) for t in texts]
+            
+            # Вычисляем матрицу сходства напрямую, без использования TF-IDF
+            n = len(processed_texts)
+            similarity_matrix = np.zeros((n, n), dtype=float)
+            
+            for i in range(n):
+                for j in range(i, n):
+                    # Используем функцию расчета схожести текстов
+                    similarity = float(self._calculate_similarity(processed_texts[i], processed_texts[j]))
+                    similarity_matrix[i, j] = similarity
+                    similarity_matrix[j, i] = similarity
+            
+            # Создаем маску схожести с явной проверкой типов
+            threshold = float(self.similarity_threshold)
+            similarity_mask = np.zeros_like(similarity_matrix, dtype=bool)
+            for i in range(n):
+                for j in range(n):
+                    similarity_mask[i, j] = similarity_matrix[i, j] > threshold
+            
+            # Находим компоненты связности
+            components = self._find_connected_components(similarity_mask)
+            
+            # Преобразуем компоненты в группы текстов
+            result = {}
+            for component in components:
+                if len(component) > 1:
+                    # Собираем тексты для этой компоненты
+                    group_texts = set(texts[i] for i in component)
+                    
+                    # Выбираем представителя группы
+                    representative = self._select_representative(group_texts)
+                    result[representative] = group_texts
+            
+            return result
+        except Exception as e:
+            print(f"Ошибка при анализе схожести: {e}")
+            return {}
     
     def _merge_overlapping_groups(self, groups: List[Tuple[str, Set[str]]]) -> Dict[str, Set[str]]:
         """Объединяет пересекающиеся группы"""
@@ -356,6 +418,11 @@ class SimilarityAnalyzer:
             return ""
         if len(texts) == 1:
             return next(iter(texts))
+        
+        # Проверяем, совпадает ли какой-либо текст с названиями университетов
+        for full_name in self.university_patterns.values():
+            if full_name in texts:
+                return full_name
         
         # Преобразуем в список для удобства
         texts_list = list(texts)
