@@ -5,19 +5,39 @@ class TextProcessor:
     @staticmethod
     def normalize(text: str) -> str:
         """
-        Нормализует текст: приводит к нижнему регистру, удаляет спецсимволы и лишние пробелы
+        Улучшенная нормализация текста для более точного сравнения
         """
+        # Приводим к строке и нижнему регистру
         text = str(text).lower()
+        
+        # Заменяем различные типы кавычек на стандартные
+        text = re.sub(r'[«»""\']', '"', text)
+        
+        # Заменяем различные типы тире на стандартное
+        text = re.sub(r'[–—−]', '-', text)
+        
+        # Заменяем различные типы пробелов на стандартные
+        text = re.sub(r'\s+', ' ', text)
+        
         # Удаляем скобки с их содержимым
         text = re.sub(r'\([^)]*\)', '', text)
-        # Оставляем только буквы, цифры и пробелы
-        text = re.sub(r'[^а-яёa-z0-9\s]', '', text)
-        # Нормализуем пробелы
+        
+        # Заменяем числа с # или № на стандартную форму
+        text = re.sub(r'[#№](\s*)(\d+)', r'номер \2', text)
+        
+        # Стандартизируем сокращения
+        text = re.sub(r'\bим\.\s+', 'имени ', text)
+        text = re.sub(r'\bг\.\s+', 'город ', text)
+        text = re.sub(r'\bул\.\s+', 'улица ', text)
+        text = re.sub(r'\bпр\.\s+', 'проспект ', text)
+        
+        # Удаляем пунктуацию и лишние пробелы
+        text = re.sub(r'[^\w\s]', ' ', text)
         text = re.sub(r'\s+', ' ', text).strip()
-        # Заменяем 'имени' на 'им'
-        text = text.replace('имени', 'им')
+        
         # Удаляем префиксы организаций
-        text = re.sub(r'^(уо|го|гуо)\s+', '', text)
+        text = re.sub(r'^(уо|го|гуо|оо)\s+', '', text)
+        
         return text
 
     @staticmethod
@@ -26,7 +46,7 @@ class TextProcessor:
         Извлекает ключевые слова из текста
         """
         normalized = TextProcessor.normalize(text)
-        words = re.findall(r'\w+', normalized)
+        words = re.findall(r'\b\w+\b', normalized)
         return [w for w in words if len(w) >= min_length]
 
     @staticmethod
@@ -38,4 +58,4 @@ class TextProcessor:
         for i, col in enumerate(columns):
             if TextProcessor.normalize(str(col)) in [TextProcessor.normalize(n) for n in num_col_names]:
                 return i
-        return None     
+        return None

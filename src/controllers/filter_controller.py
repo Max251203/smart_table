@@ -58,43 +58,60 @@ class FilterController(QObject):
 
         column_name = self.column_box.currentText()
         
-        # Специальная обработка для места работы (учёбы)
-        if "место работы" in column_name.lower() or "учёбы" in column_name.lower():
-            try:
-                similar_groups = self.data_processor.analyze_column(column_name)
-                
-                # Собираем все возможные значения
-                all_values = []
-                for key, values in similar_groups.items():
-                    all_values.append(key)
-                    all_values.extend(values)
-                
-                # Настраиваем комбобокс ключевых слов
-                self.keyword_edit.setup(sorted(all_values))
-                
-            except Exception as e:
-                print(f"Ошибка при анализе колонки: {e}")
-                # Если ошибка, просто добавляем уникальные значения
-                values = self.table_controller.get_column_values(column_name)
-                unique_values = sorted(set([str(v).strip() for v in values if str(v).strip()]))
-                self.keyword_edit.setup(unique_values)
-        else:
+        try:
+            # Получаем все уникальные значения колонки
             values = self.table_controller.get_column_values(column_name)
-            # Определяем: нужно ли сортировать численно?
+            
+            # Определяем, является ли колонка числовой
             if self.is_numeric_column(values):
                 try:
+                    # Обрабатываем числовые значения
                     numeric_values = sorted(
                         [float(v) for v in values if str(v).strip() != ""]
                     )
                     # Оставим отображение в исходном виде (без .0 если целое)
                     display_values = [str(int(v)) if float(v).is_integer() else str(v) for v in numeric_values]
                     self.keyword_edit.setup(display_values)
-                except Exception:
+                except Exception as e:
+                    print(f"Ошибка при обработке числовых значений: {e}")
                     filtered_values = sorted([str(v).strip() for v in values if str(v).strip()])
                     self.keyword_edit.setup(filtered_values)
             else:
-                filtered_values = sorted([str(v).strip() for v in values if str(v).strip()])
-                self.keyword_edit.setup(filtered_values)
+                # Для текстовых колонок применяем группировку схожих значений
+                # Это поможет избежать дублирования схожих записей в списке
+                try:
+                    # Анализируем колонку для поиска схожих значений
+                    similar_groups = self.data_processor.analyze_column(column_name)
+                    
+                    # Собираем уникальные значения, избегая дублирования
+                    unique_values = []
+                    used_values = set()
+                    
+                    # Сначала добавляем представителей групп (обычно более полные названия)
+                    for key in similar_groups.keys():
+                        unique_values.append(key)
+                        used_values.add(key)
+                        used_values.update(similar_groups[key])
+                    
+                    # Затем добавляем остальные значения, которые не попали в группы
+                    for value in values:
+                        value_str = str(value).strip()
+                        if value_str and value_str not in used_values:
+                            unique_values.append(value_str)
+                            used_values.add(value_str)
+                    
+                    # Настраиваем комбобокс с уникальными значениями
+                    self.keyword_edit.setup(sorted(unique_values))
+                    
+                except Exception as e:
+                    print(f"Ошибка при анализе колонки: {e}")
+                    # В случае ошибки просто добавляем все уникальные значения
+                    filtered_values = sorted(set([str(v).strip() for v in values if str(v).strip()]))
+                    self.keyword_edit.setup(filtered_values)
+        except Exception as e:
+            print(f"Ошибка при обновлении списка значений: {e}")
+            # Если что-то пошло не так, просто очищаем список
+            self.keyword_edit.clear()
 
     def apply_filter(self):
         if self.current_filter_worker is not None:

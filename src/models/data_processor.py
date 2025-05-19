@@ -80,11 +80,27 @@ class DataProcessor:
         self.current_df = pd.concat([self.current_df, pd.DataFrame([new_row])], ignore_index=True)
 
     def analyze_column(self, column_name: str) -> Dict[str, set]:
+        """Анализирует колонку и находит группы схожих значений"""
         if self.current_df is None:
             return {}
-        values = self.current_df[column_name].unique().tolist()
-        self.similar_groups = self.grouper.group(values)
-        return self.similar_groups
+            
+        try:
+            # Получаем все уникальные значения колонки
+            values = [str(v) for v in self.current_df[column_name].unique() if v and str(v).strip()]
+            
+            # Группируем схожие значения
+            self.similar_groups = self.grouper.group(values)
+            
+            # Для отладки выведем найденные группы
+            print(f"Найдено {len(self.similar_groups)} групп схожих значений в колонке '{column_name}'")
+            for key, group in self.similar_groups.items():
+                if len(group) > 1:  # Показываем только группы с более чем одним элементом
+                    print(f"  Группа '{key}': {group}")
+            
+            return self.similar_groups
+        except Exception as e:
+            print(f"Ошибка при анализе колонки '{column_name}': {e}")
+            return {}
 
     def filter_data(self, column: str, filter_text: str) -> pd.DataFrame:
         if self.current_df is None or column not in self.current_df.columns:

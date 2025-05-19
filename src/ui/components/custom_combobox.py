@@ -80,13 +80,22 @@ class SmartComboBox(QComboBox):
         
         if not items:
             return
+        
+        # Убедимся, что все элементы строки и уникальны
+        unique_items = []
+        seen = set()
+        for item in items:
+            item_str = str(item).strip()
+            if item_str and item_str not in seen:
+                unique_items.append(item_str)
+                seen.add(item_str)
             
         # Добавляем элементы в выпадающий список
-        self.addItems(items)
+        self.addItems(unique_items)
         
         # Настраиваем автодополнение, если комбобокс редактируемый
         if self.isEditable():
-            completer = QCompleter(items)
+            completer = QCompleter(unique_items)
             completer.setCaseSensitivity(Qt.CaseInsensitive)
             completer.setFilterMode(Qt.MatchContains)  # Подсказки содержащие введенный текст
             self.setCompleter(completer)
