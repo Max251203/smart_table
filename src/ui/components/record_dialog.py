@@ -265,27 +265,59 @@ class RecordDialog(QDialog):
                 QMessageBox.warning(
                     self, 
                     "Пустая запись", 
-                    "Невозможно добавить полностью пустую запись. Введите хотя бы одно значение."
+                    "Невозможно сохранить полностью пустую запись. Введите хотя бы одно значение."
                 )
                 return  # Остаемся в диалоге
-                
-            # Пытаемся добавить запись
-            success = self.table_controller.add_record(record_data)
             
-            if success:
-                QMessageBox.information(
-                    self, 
-                    "Запись добавлена", 
-                    "Новая запись успешно добавлена в таблицу и сохранена в Excel-файл."
-                )
-                self.success = True  # Устанавливаем флаг успешного добавления
-                super().accept()  # Закрываем диалог только при успехе
-            else:
+            # Определяем, это добавление или редактирование
+            is_editing = hasattr(self, 'row_id') and self.row_id is not None
+            
+            try:
+                # Проверяем, можно ли сохранить в Excel
+                if self.table_controller.current_file_path and not self.table_controller._can_save_to_excel():
+                    QMessageBox.critical(
+                        self, 
+                        "Ошибка сохранения", 
+                        f"Не удалось {'обновить' if is_editing else 'добавить'} запись. Возможно, Excel-файл заблокирован для записи или открыт в другой программе.",
+                        QMessageBox.Ok
+                    )
+                    return  # Остаемся в диалоге
+                
+                success = False
+                
+                # Если это редактирование, обновляем запись по ID
+                if is_editing:
+                    success = self.table_controller.update_record(self.row_id, record_data)
+                else:
+                    # Для добавления используем существующий метод
+                    success = self.table_controller.add_record(record_data)
+                
+                if success:
+                    action_done = "обновлена" if is_editing else "добавлена"
+                    QMessageBox.information(
+                        self, 
+                        f"Запись {action_done}", 
+                        f"Запись успешно {action_done} в таблицу и сохранена в Excel-файл."
+                    )
+                    self.success = True  # Устанавливаем флаг успешного добавления/редактирования
+                    super().accept()  # Закрываем диалог только при успехе
+                else:
+                    action_text = "обновить" if is_editing else "добавить"
+                    QMessageBox.critical(
+                        self, 
+                        "Ошибка сохранения", 
+                        f"Не удалось {action_text} запись. Возможно, произошла непредвиденная ошибка.",
+                        QMessageBox.Ok
+                    )
+                    # Остаемся в диалоге
+            except Exception as e:
+                import traceback
+                print(f"Ошибка при {'редактировании' if is_editing else 'добавлении'} записи: {e}")
+                print(traceback.format_exc())
                 QMessageBox.critical(
                     self, 
-                    "Ошибка сохранения", 
-                    "Не удалось добавить запись. Возможно, Excel-файл заблокирован для записи или открыт в другой программе.",
-                    QMessageBox.Ok
+                    "Ошибка", 
+                    f"Произошла ошибка при {'редактировании' if is_editing else 'добавлении'} записи: {str(e)}"
                 )
                 # Остаемся в диалоге
         else:

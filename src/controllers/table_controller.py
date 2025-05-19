@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from PySide6.QtCore import QObject, Qt
 from PySide6.QtWidgets import QMessageBox, QPushButton
 from models.table_model import SmartTableModel
@@ -205,4 +205,108 @@ class TableController(QObject):
                 
         except Exception as e:
             print(f"Ошибка при сохранении файла: {e}")
+            return False
+    
+    def get_row_id(self, row_index: int) -> str:
+        """Получает уникальный идентификатор строки по её индексу в текущей модели."""
+        if self.model is None:
+            return ""
+        
+        # Определяем колонку с ID (всегда используем Excel # или №)
+        id_col_name = None
+        for col_idx in range(self.model.columnCount()):
+            header = self.model.headerData(col_idx, Qt.Horizontal)
+            if header.lower() in ["excel #", "№"]:
+                id_col_name = header
+                id_col_idx = col_idx
+                break
+        
+        if id_col_name is None:
+            return ""
+        
+        # Получаем значение ID из модели
+        return str(self.model.data(self.model.index(row_index, id_col_idx), Qt.DisplayRole))
+    
+    def find_row_by_id(self, row_id: str) -> int:
+        """Находит индекс строки в DataFrame по её ID."""
+        if self.model is None or self.data_processor.current_df is None:
+            return -1
+        
+        # Определяем колонку с ID
+        id_col_name = None
+        for col in self.data_processor.current_df.columns:
+            if col.lower() in ["excel #", "№"]:
+                id_col_name = col
+                break
+        
+        if id_col_name is None:
+            return -1
+        
+        # Ищем строку по ID
+        for i, row in self.data_processor.current_df.iterrows():
+            if str(row[id_col_name]) == row_id:
+                return i
+        
+        return -1
+        
+    def update_record(self, row_id: str, record_data: Dict[str, Any]) -> bool:
+        """Обновляет запись по её ID."""
+        if self.model is None or self.data_processor.current_df is None:
+            return False
+            
+        try:
+            # Находим строку по ID
+            row_index = self.find_row_by_id(row_id)
+            if row_index == -1:
+                return False
+            
+            # Обновляем значения
+            for col, value in record_data.items():
+                if col in self.data_processor.current_df.columns:
+                    # Не обновляем колонку ID
+                    if col.lower() not in ["excel #", "№", "№ (порядок)"]:
+                        self.data_processor.current_df.at[row_index, col] = value
+            
+            # Сохраняем изменения
+            if self.current_file_path:
+                save_result = self.save_to_excel()
+                if not save_result:
+                    return False
+            
+            # Обновляем модель
+            self.model.set_dataframe(self.data_processor.current_df)
+            self.view.adjust_columns()
+            return True
+                
+        except Exception as e:
+            print(f"Ошибка при обновлении записи: {e}")
+            return False
+            
+    def delete_record(self, row_id: str) -> bool:
+        """Удаляет запись по её ID."""
+        if self.model is None or self.data_processor.current_df is None:
+            return False
+            
+        try:
+            # Находим строку по ID
+            row_index = self.find_row_by_id(row_id)
+            if row_index == -1:
+                return False
+            
+            # Удаляем строку
+            self.data_processor.current_df = self.data_processor.current_df.drop(index=row_index).reset_index(drop=True)
+            
+            # Сохраняем изменения
+            if self.current_file_path:
+                save_result = self.save_to_excel()
+                if not save_result:
+                    return False
+            
+            # Обновляем модель
+            self.model.set_dataframe(self.data_processor.current_df)
+            self.view.adjust_columns()
+            return True
+                
+        except Exception as e:
+            print(f"Ошибка при удалении записи: {e}")
             return False

@@ -188,13 +188,23 @@ class MainWindow(QMainWindow):
         self._update_search_button_state()
 
     # Метод для добавления записи в MainWindow
-    # main_window.py - обновляем метод _show_add_record_dialog
-    def _show_add_record_dialog(self):
+    def _show_add_record_dialog(self, record_data=None):
+        """Метод для добавления или редактирования записи."""
         if self.table_controller.model is None:
             QMessageBox.warning(self, "Предупреждение", "Сначала загрузите Excel файл.")
             return
             
         columns = self.table_controller.get_columns()
+        
+        # Определяем, это добавление или редактирование
+        is_editing = record_data is not None and isinstance(record_data, dict)
+        
+        # Если это редактирование, извлекаем ID строки
+        row_id = None
+        if is_editing and isinstance(record_data, dict) and '__row_id__' in record_data:
+            row_id = record_data['__row_id__']
+            # Удаляем служебное поле из данных
+            del record_data['__row_id__']
         
         # Собираем существующие значения для автозаполнения
         column_values = {}
@@ -228,19 +238,56 @@ class MainWindow(QMainWindow):
             except:
                 column_max_lengths[column] = 0
                 
+        # Создаем диалог с передачей данных записи (если редактирование)
         dialog = RecordDialog(
             columns, 
             self,
+            record_data=record_data if is_editing else None,  # None для добавления, данные для редактирования
             column_max_lengths=column_max_lengths,
             column_values=column_values,
             work_place_groups=work_place_groups,
-            table_controller=self.table_controller  # Передаем контроллер таблицы
+            table_controller=self.table_controller
         )
         
-        if dialog.exec():
-            # Если диалог был успешно закрыт (запись добавлена)
-            if dialog.success:
-                # Обновляем список ключевых слов для текущей колонки
-                current_column = self.column_box.currentText()
-                if current_column:
-                    self.filter_controller.on_column_change(self.column_box.currentIndex())
+        # Сохраняем ID строки в диалоге для последующего использования
+        if is_editing and row_id is not None:
+            dialog.row_id = row_id
+        
+        # Устанавливаем заголовок в зависимости от режима
+        dialog.setWindowTitle("Редактирование записи" if is_editing else "Добавление записи")
+        
+        # Запускаем диалог и обновляем список ключевых слов при успехе
+        dialog.exec()
+        if dialog.success:
+            # Обновляем список ключевых слов для текущей колонки
+            current_column = self.column_box.currentText()
+            if current_column:
+                self.filter_controller.on_column_change(self.column_box.currentIndex())
+
+    def _delete_record(self, row_id):
+        """Удаление записи по ID."""
+        if self.table_controller.model is None:
+            return
+            
+        # Удаляем запись по ID
+        success = self.table_controller.delete_record(row_id)
+        
+        if success:
+            # Сообщаем об успехе
+            QMessageBox.information(
+                self, 
+                "Запись удалена", 
+                "Запись успешно удалена из таблицы и изменения сохранены в Excel-файле."
+            )
+            
+            # Обновляем список ключевых слов
+            current_column = self.column_box.currentText()
+            if current_column:
+                self.filter_controller.on_column_change(self.column_box.currentIndex())
+        else:
+            # Сообщаем об ошибке
+            QMessageBox.critical(
+                self, 
+                "Ошибка удаления", 
+                "Не удалось удалить запись. Возможно, Excel-файл заблокирован для записи или открыт в другой программе."
+            )
