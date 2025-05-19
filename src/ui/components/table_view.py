@@ -87,24 +87,33 @@ class SmartTableView(QTableView):
         # Получаем индекс строки
         row_index = index.row()
         
-        # Получаем данные текущей записи
+        # Получаем данные текущей записи из модели
         record_data = {}
         for col in range(self.model().columnCount()):
             column_name = self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole)
-            cell_value = self.model().data(self.model().index(row_index, col), Qt.DisplayRole)
-            record_data[column_name] = cell_value
+            # Пропускаем виртуальную колонку порядка
+            if column_name != "№ (порядок)":
+                cell_value = self.model().data(self.model().index(row_index, col), Qt.DisplayRole)
+                record_data[column_name] = cell_value
         
-        # Получаем ID строки
+        # Получаем ID строки напрямую из модели
+        if hasattr(self.model(), 'get_real_row_id'):
+            row_id = self.model().get_real_row_id(row_index)
+        else:
+            # Резервный вариант
+            main_window = self.window()
+            if hasattr(main_window, 'table_controller'):
+                row_id = main_window.table_controller.get_row_id(row_index)
+            else:
+                row_id = ""
+        
+        # Сохраняем ID в данных записи
+        record_data['__row_id__'] = row_id
+        
+        # Вызываем метод редактирования записи через родительское окно
         main_window = self.window()
-        if hasattr(main_window, 'table_controller'):
-            row_id = main_window.table_controller.get_row_id(row_index)
-            
-            # Сохраняем ID в данных записи
-            record_data['__row_id__'] = row_id
-            
-            # Вызываем метод редактирования записи через родительское окно
-            if hasattr(main_window, '_show_add_record_dialog'):
-                main_window._show_add_record_dialog(record_data)
+        if hasattr(main_window, '_show_add_record_dialog'):
+            main_window._show_add_record_dialog(record_data)
 
     def delete_record(self, index):
         if not index.isValid():
@@ -113,24 +122,35 @@ class SmartTableView(QTableView):
         # Получаем индекс строки
         row_index = index.row()
         
-        # Получаем ID строки
-        main_window = self.window()
-        if hasattr(main_window, 'table_controller'):
-            row_id = main_window.table_controller.get_row_id(row_index)
-            
-            # Показываем диалог подтверждения
-            confirm = QMessageBox.question(
-                self,
-                "Подтверждение удаления",
-                "Вы действительно хотите удалить эту запись?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            
-            if confirm == QMessageBox.Yes:
-                # Вызываем метод удаления записи через родительское окно
-                if hasattr(main_window, '_delete_record'):
-                    main_window._delete_record(row_id)
+        # Получаем ID строки напрямую из модели
+        if hasattr(self.model(), 'get_real_row_id'):
+            row_id = self.model().get_real_row_id(row_index)
+        else:
+            # Резервный вариант
+            main_window = self.window()
+            if hasattr(main_window, 'table_controller'):
+                row_id = main_window.table_controller.get_row_id(row_index)
+            else:
+                row_id = ""
+        
+        if not row_id:
+            QMessageBox.critical(self, "Ошибка", "Не удалось определить ID записи для удаления.")
+            return
+        
+        # Показываем диалог подтверждения
+        confirm = QMessageBox.question(
+            self,
+            "Подтверждение удаления",
+            "Вы действительно хотите удалить эту запись?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if confirm == QMessageBox.Yes:
+            # Вызываем метод удаления записи через родительское окно
+            main_window = self.window()
+            if hasattr(main_window, '_delete_record'):
+                main_window._delete_record(row_id)
 
     def select_column(self, column_index: int):
         self.clearSelection()

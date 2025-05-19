@@ -273,6 +273,9 @@ class MainWindow(QMainWindow):
         success = self.table_controller.delete_record(row_id)
         
         if success:
+            # Сбрасываем режим колонки номеров в "excel"
+            self.table_controller.set_number_mode("excel")
+            
             # Сообщаем об успехе
             QMessageBox.information(
                 self, 

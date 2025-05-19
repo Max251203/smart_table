@@ -212,20 +212,8 @@ class TableController(QObject):
         if self.model is None:
             return ""
         
-        # Определяем колонку с ID (всегда используем Excel # или №)
-        id_col_name = None
-        for col_idx in range(self.model.columnCount()):
-            header = self.model.headerData(col_idx, Qt.Horizontal)
-            if header.lower() in ["excel #", "№"]:
-                id_col_name = header
-                id_col_idx = col_idx
-                break
-        
-        if id_col_name is None:
-            return ""
-        
-        # Получаем значение ID из модели
-        return str(self.model.data(self.model.index(row_index, id_col_idx), Qt.DisplayRole))
+        # Используем метод модели для получения реального ID независимо от режима
+        return self.model.get_real_row_id(row_index)
     
     def find_row_by_id(self, row_id: str) -> int:
         """Находит индекс строки в DataFrame по её ID."""

@@ -84,3 +84,21 @@ class SmartTableModel(QAbstractTableModel):
 
     def get_column_data(self, column_index: int) -> pd.Series:
         return self._df.iloc[:, column_index]
+        
+    def get_real_row_id(self, row_index: int) -> str:
+        """Получает реальный ID строки независимо от режима отображения."""
+        if row_index < 0 or row_index >= len(self._filtered_df):
+            return ""
+        
+        # Ищем колонку с ID
+        id_col = None
+        for col in self._filtered_df.columns:
+            if col.lower() in ["excel #", "№"]:
+                id_col = col
+                break
+        
+        if id_col is None:
+            return ""
+        
+        # Возвращаем реальное значение ID из DataFrame
+        return str(self._filtered_df.iloc[row_index][id_col])

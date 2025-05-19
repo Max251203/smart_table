@@ -293,6 +293,9 @@ class RecordDialog(QDialog):
                     success = self.table_controller.add_record(record_data)
                 
                 if success:
+                    # Сбрасываем режим колонки номеров в "excel"
+                    self.table_controller.set_number_mode("excel")
+                    
                     action_done = "обновлена" if is_editing else "добавлена"
                     QMessageBox.information(
                         self, 
